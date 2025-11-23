@@ -22,7 +22,7 @@ IAM_ROLE_ARN = os.getenv('IAM_ROLE_ARN', '')  # Optional: ARN of IAM role to ass
 
 # Motion Detection Settings
 MOTION_THRESHOLD = float(os.getenv('MOTION_THRESHOLD', '5000.0'))  # Adjust based on sensitivity
-MIN_MOTION_AREA = int(os.getenv('MIN_MOTION_AREA', '500'))  # Minimum area to consider as motion
+MIN_MOTION_AREA = int(os.getenv('MIN_MOTION_AREA', '18432'))  # Minimum area to consider as motion (2% of 1280x720 frame)
 SAVE_IMAGES = os.getenv('SAVE_IMAGES', 'true').lower() == 'true'
 SAVE_CLIPS = os.getenv('SAVE_CLIPS', 'true').lower() == 'true'
 CLIP_DURATION = int(os.getenv('CLIP_DURATION', '30'))  # Seconds to record after motion
