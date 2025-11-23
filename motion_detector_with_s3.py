@@ -6,6 +6,8 @@ Detects motion, saves clips/images, and uploads to AWS S3
 import cv2
 import numpy as np
 import time
+import subprocess
+import os
 from datetime import datetime
 from pathlib import Path
 import logging
@@ -95,11 +97,15 @@ class MotionDetector:
         height, width = frame.shape[:2]
         fps = 20  # Frames per second
         
-        # Initialize video writer with H.264 codec for browser compatibility
-        fourcc = cv2.VideoWriter_fourcc(*'avc1')
+        # Initialize video writer with mp4v codec (will be transcoded to H.264 later)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         self.clip_writer = cv2.VideoWriter(
             str(filename), fourcc, fps, (width, height)
         )
+
+        if not self.clip_writer.isOpened():
+            logger.error("Failed to open video writer with mp4v codec!")
+            self.clip_writer = None
         
         self.clip_frames = []
         self.motion_start_time = time.time()
@@ -134,6 +140,73 @@ class MotionDetector:
             self.clip_writer.release()
         self.camera.release()
         cv2.destroyAllWindows()
+
+
+def transcode_to_h264(input_path: str) -> str:
+    """
+    Transcode video to H.264 codec using FFmpeg for browser compatibility.
+    Returns the path to the transcoded file, or None if transcoding failed.
+    """
+    input_file = Path(input_path)
+    output_file = input_file.with_suffix('.h264.mp4')
+
+    try:
+        # FFmpeg command to transcode to H.264
+        # -y: overwrite output file without asking
+        # -i: input file
+        # -c:v libx264: use H.264 codec
+        # -preset fast: balance between encoding speed and compression
+        # -crf 23: constant rate factor (quality), lower = better quality
+        # -c:a copy: copy audio stream as-is (if any)
+        # -movflags +faststart: optimize for web streaming
+        cmd = [
+            'ffmpeg',
+            '-y',
+            '-i', str(input_file),
+            '-c:v', 'libx264',
+            '-preset', 'fast',
+            '-crf', '23',
+            '-movflags', '+faststart',
+            str(output_file)
+        ]
+
+        logger.info(f"Transcoding {input_file.name} to H.264...")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minute timeout
+        )
+
+        if result.returncode != 0:
+            logger.error(f"FFmpeg transcoding failed: {result.stderr}")
+            return None
+
+        # Verify output file exists and has content
+        if not output_file.exists() or output_file.stat().st_size == 0:
+            logger.error("Transcoded file is empty or doesn't exist")
+            return None
+
+        # Remove original file and rename transcoded file
+        input_file.unlink()
+        output_file.rename(input_file)
+
+        logger.info(f"Transcoding complete: {input_file.name}")
+        return str(input_file)
+
+    except subprocess.TimeoutExpired:
+        logger.error("FFmpeg transcoding timed out")
+        if output_file.exists():
+            output_file.unlink()
+        return None
+    except FileNotFoundError:
+        logger.error("FFmpeg not found. Please install FFmpeg: sudo apt install ffmpeg")
+        return None
+    except Exception as e:
+        logger.error(f"Transcoding error: {e}")
+        if output_file.exists():
+            output_file.unlink()
+        return None
 
 
 def main():
@@ -187,13 +260,22 @@ def main():
                 if time.time() - last_motion_time < CLIP_DURATION:
                     detector.add_frame_to_clip(frame)
                 else:
-                    # Stop recording and upload clip
+                    # Stop recording and transcode to H.264 for browser compatibility
                     clip_path, duration = detector.stop_clip_recording()
                     clip_recording = False
-                    
-                    if clip_path and s3_uploader and S3_UPLOAD_ON_MOTION:
-                        if not s3_uploader.upload_motion_clip(clip_path, duration, motion_score=0):
-                            raise RuntimeError(f"Failed to upload motion clip to S3: {clip_path}")
+
+                    if clip_path:
+                        # Transcode to H.264 before uploading
+                        transcoded_path = transcode_to_h264(clip_path)
+                        if transcoded_path:
+                            clip_path = transcoded_path
+                        else:
+                            logger.warning(f"Transcoding failed, uploading original: {clip_path}")
+
+                        # Upload to S3
+                        if s3_uploader and S3_UPLOAD_ON_MOTION:
+                            if not s3_uploader.upload_motion_clip(clip_path, duration, motion_score=0):
+                                raise RuntimeError(f"Failed to upload motion clip to S3: {clip_path}")
             
             # Small delay to prevent CPU overload
             time.sleep(0.05)
