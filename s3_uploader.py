@@ -41,13 +41,14 @@ class S3Uploader:
         # Initialize S3 client
         self._refresh_s3_client()
         
-        # Verify bucket exists
+        # Try to verify bucket exists (non-fatal if we don't have ListBucket permission)
         try:
             self.s3_client.head_bucket(Bucket=bucket_name)
             logger.info(f"Connected to S3 bucket: {bucket_name}")
         except Exception as e:
-            logger.error(f"Error accessing bucket {bucket_name}: {e}")
-            raise
+            # Log warning but don't fail - we'll get an error on upload if bucket doesn't exist
+            logger.warning(f"Could not verify bucket {bucket_name} (this is OK if role lacks ListBucket permission): {e}")
+            logger.info(f"S3 uploader initialized for bucket: {bucket_name}")
     
     def _refresh_s3_client(self):
         """Refresh S3 client, assuming role if configured"""

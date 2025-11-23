@@ -38,8 +38,9 @@ export class MotionDetectionStack extends cdk.Stack {
       description: 'Role for Raspberry Pi to upload motion detection files to S3',
     });
 
-    // Allow the role to upload to the bucket
+    // Allow the role to upload to the bucket and list objects
     bucket.grantWrite(uploadRole);
+    bucket.grantRead(uploadRole); // Allows ListBucket for verification
 
     // Outputs
     new cdk.CfnOutput(this, 'BucketName', {
