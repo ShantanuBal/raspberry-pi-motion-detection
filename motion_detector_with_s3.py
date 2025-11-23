@@ -268,6 +268,12 @@ def main():
                         if not s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score):
                             raise RuntimeError(f"Failed to upload motion clip to S3: {clip_path}")
 
+                # Reset prev_gray to avoid false positive on next detection
+                ret, frame = detector.camera.read()
+                if ret:
+                    detector.prev_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    detector.prev_gray = cv2.GaussianBlur(detector.prev_gray, (21, 21), 0)
+
             # Small delay to prevent CPU overload
             time.sleep(0.05)
 
