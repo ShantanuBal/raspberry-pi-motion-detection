@@ -276,14 +276,9 @@ def main():
                     clip_filename = detector.start_clip_recording(frame)
                     clip_recording = True
                 
-                # Save image
+                # Save image locally (for web dashboard)
                 if SAVE_IMAGES:
-                    image_path = detector.save_image(frame, motion_score)
-                    
-                    # Upload to S3 if enabled
-                    if s3_uploader and S3_UPLOAD_ON_MOTION:
-                        if not s3_uploader.upload_motion_image(image_path, motion_score):
-                            raise RuntimeError(f"Failed to upload motion image to S3: {image_path}")
+                    detector.save_image(frame, motion_score)
                 
                 # Add frame to clip
                 if clip_recording:
