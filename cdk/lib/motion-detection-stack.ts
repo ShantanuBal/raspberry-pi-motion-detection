@@ -42,6 +42,14 @@ export class MotionDetectionStack extends cdk.Stack {
     bucket.grantWrite(uploadRole);
     bucket.grantRead(uploadRole); // Allows ListBucket for verification
 
+    // IAM User for Vercel webapp (read-only access)
+    const vercelUser = new iam.User(this, 'MotionViewerVercelUser', {
+      userName: 'motion-viewer-vercel-user',
+    });
+
+    // Grant read-only access to the bucket for the Vercel user
+    bucket.grantRead(vercelUser);
+
     // Outputs
     new cdk.CfnOutput(this, 'BucketName', {
       value: bucket.bucketName,
@@ -63,9 +71,15 @@ export class MotionDetectionStack extends cdk.Stack {
       description: 'IAM user name for accessing the role',
     });
 
+    new cdk.CfnOutput(this, 'VercelUserName', {
+      value: vercelUser.userName,
+      description: 'IAM user name for Vercel webapp (read-only access)',
+    });
+
     // Note: Access keys need to be created manually via AWS Console or CLI
     // After deployment, run:
     // aws iam create-access-key --user-name motion-detection-pi-user
+    // aws iam create-access-key --user-name motion-viewer-vercel-user
   }
 }
 
