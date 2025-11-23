@@ -51,6 +51,7 @@ class MotionDetector:
             raise RuntimeError("Could not read initial frame")
         
         self.prev_gray = cv2.cvtColor(self.prev_frame, cv2.COLOR_BGR2GRAY)
+        self.prev_gray_blur = cv2.GaussianBlur(self.prev_gray, (21, 21), 0)
         self.motion_detected = False
         self.motion_start_time = None
         self.clip_writer = None
@@ -61,12 +62,10 @@ class MotionDetector:
     def detect_motion(self, frame):
         """Detect motion in current frame"""
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-        # Apply Gaussian blur to reduce noise
-        gray = cv2.GaussianBlur(gray, (21, 21), 0)
+        gray_blur = cv2.GaussianBlur(gray, (21, 21), 0)
         
         # Calculate frame difference
-        frame_diff = cv2.absdiff(self.prev_gray, gray)
+        frame_diff = cv2.absdiff(self.prev_gray_blur, gray_blur)
         thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)[1]
         thresh = cv2.dilate(thresh, None, iterations=2)
         
@@ -84,7 +83,7 @@ class MotionDetector:
                 motion_score += area
                 max_area = max(max_area, area)
         
-        self.prev_gray = gray
+        self.prev_gray_blur = gray_blur
         
         return motion_detected, motion_score, max_area
     
@@ -272,7 +271,7 @@ def main():
                 ret, frame = detector.camera.read()
                 if ret:
                     detector.prev_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                    detector.prev_gray = cv2.GaussianBlur(detector.prev_gray, (21, 21), 0)
+                    detector.prev_gray_blur = cv2.GaussianBlur(detector.prev_gray, (21, 21), 0)
 
             # Small delay to prevent CPU overload
             time.sleep(0.05)
