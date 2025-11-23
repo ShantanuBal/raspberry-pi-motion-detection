@@ -167,7 +167,7 @@ export default function HomePage() {
                   controls
                   autoPlay
                   className="w-full rounded"
-                  onLoadStart={() => console.log("[video] Load started")}
+                  onLoadStart={() => console.log("[video] Load started, S3 URL:", videoUrl)}
                   onLoadedData={() => console.log("[video] Data loaded")}
                   onCanPlay={() => console.log("[video] Can play")}
                   onError={(e) => {
