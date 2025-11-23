@@ -51,19 +51,24 @@ export default function HomePage() {
   };
 
   const playVideo = async (video: Video) => {
+    console.log("[playVideo] Starting to load video:", video.name);
+    console.log("[playVideo] Video key:", video.key);
     setSelectedVideo(video);
     setLoadingVideo(true);
     setVideoUrl(null);
 
     try {
       const encodedKey = Buffer.from(video.key).toString("base64");
+      console.log("[playVideo] Encoded key:", encodedKey);
       const response = await fetch(`/api/videos/${encodedKey}`);
+      console.log("[playVideo] API response status:", response.status);
       if (!response.ok) throw new Error("Failed to get video URL");
       const data = await response.json();
+      console.log("[playVideo] Presigned URL received:", data.url);
       setVideoUrl(data.url);
     } catch (err) {
       setError("Failed to load video");
-      console.error(err);
+      console.error("[playVideo] Error:", err);
     } finally {
       setLoadingVideo(false);
     }
@@ -162,6 +167,15 @@ export default function HomePage() {
                   controls
                   autoPlay
                   className="w-full rounded"
+                  onLoadStart={() => console.log("[video] Load started")}
+                  onLoadedData={() => console.log("[video] Data loaded")}
+                  onCanPlay={() => console.log("[video] Can play")}
+                  onError={(e) => {
+                    const video = e.currentTarget;
+                    console.error("[video] Error:", video.error?.message, video.error?.code);
+                    console.error("[video] Network state:", video.networkState);
+                    console.error("[video] Ready state:", video.readyState);
+                  }}
                 >
                   Your browser does not support the video tag.
                 </video>

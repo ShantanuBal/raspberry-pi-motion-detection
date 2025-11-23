@@ -95,8 +95,8 @@ class MotionDetector:
         height, width = frame.shape[:2]
         fps = 20  # Frames per second
         
-        # Initialize video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        # Initialize video writer with H.264 codec for browser compatibility
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
         self.clip_writer = cv2.VideoWriter(
             str(filename), fourcc, fps, (width, height)
         )
