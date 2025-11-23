@@ -89,11 +89,13 @@ class S3Uploader:
             metadata: Optional metadata to attach to the object
             
         Returns:
-            True if successful, False otherwise
+            True if successful
+            
+        Raises:
+            RuntimeError: If upload fails
         """
         if not os.path.exists(local_path):
-            logger.error(f"File not found: {local_path}")
-            return False
+            raise FileNotFoundError(f"File not found: {local_path}")
         
         try:
             # Generate S3 key if not provided
@@ -122,7 +124,7 @@ class S3Uploader:
             
         except Exception as e:
             logger.error(f"Error uploading {local_path} to S3: {e}")
-            return False
+            raise RuntimeError(f"S3 upload failed: {e}") from e
     
     def upload_motion_image(self, image_path: str, motion_score: Optional[float] = None) -> bool:
         """

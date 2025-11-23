@@ -237,16 +237,13 @@ def main():
     # Initialize S3 uploader if enabled
     s3_uploader = None
     if UPLOAD_TO_S3:
-        try:
-            s3_uploader = S3Uploader(
-                bucket_name=S3_BUCKET_NAME,
-                region=AWS_REGION,
-                role_arn=IAM_ROLE_ARN if IAM_ROLE_ARN else None
-            )
-            logger.info("S3 uploader initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize S3 uploader: {e}")
-            logger.info("Continuing without S3 upload...")
+        logger.info("Initializing S3 uploader...")
+        s3_uploader = S3Uploader(
+            bucket_name=S3_BUCKET_NAME,
+            region=AWS_REGION,
+            role_arn=IAM_ROLE_ARN if IAM_ROLE_ARN else None
+        )
+        logger.info("S3 uploader initialized successfully")
     
     # Initialize motion detector
     detector = MotionDetector()
@@ -285,7 +282,8 @@ def main():
                     
                     # Upload to S3 if enabled
                     if s3_uploader and S3_UPLOAD_ON_MOTION:
-                        s3_uploader.upload_motion_image(image_path, motion_score)
+                        if not s3_uploader.upload_motion_image(image_path, motion_score):
+                            raise RuntimeError(f"Failed to upload motion image to S3: {image_path}")
                 
                 # Add frame to clip
                 if clip_recording:
@@ -303,13 +301,17 @@ def main():
                     clip_recording = False
                     
                     if clip_path and s3_uploader and S3_UPLOAD_ON_MOTION:
-                        s3_uploader.upload_motion_clip(clip_path, duration, motion_score=0)
+                        if not s3_uploader.upload_motion_clip(clip_path, duration, motion_score=0):
+                            raise RuntimeError(f"Failed to upload motion clip to S3: {clip_path}")
             
             # Small delay to prevent CPU overload
             time.sleep(0.05)
     
     except KeyboardInterrupt:
         logger.info("Stopping motion detection...")
+    except Exception as e:
+        logger.error(f"Fatal error in motion detection: {e}")
+        raise
     finally:
         if clip_recording:
             detector.stop_clip_recording()
