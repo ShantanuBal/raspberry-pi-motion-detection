@@ -224,12 +224,7 @@ def main():
     
     # Initialize motion detector
     detector = MotionDetector()
-    
-    # Main detection loop
-    clip_recording = False
-    clip_filename = None
-    last_motion_time = 0
-    
+
     try:
         logger.info("Starting motion detection...")
         while True:
@@ -237,57 +232,51 @@ def main():
             if not ret:
                 logger.error("Failed to read frame")
                 break
-            
+
             motion_detected, motion_score, max_area = detector.detect_motion(frame)
-            
-            if motion_detected:
-                current_time = time.time()
-                last_motion_time = current_time
-                
-                # Start recording clip if not already recording
-                if SAVE_CLIPS and not clip_recording:
-                    clip_filename = detector.start_clip_recording(frame)
-                    clip_recording = True
-                
-                # Add frame to clip
-                if clip_recording:
-                    detector.add_frame_to_clip(frame)
-                
+
+            if motion_detected and SAVE_CLIPS:
                 logger.info(f"Motion detected! Score: {motion_score:.0f}, Area: {max_area:.0f}")
-            
-            # Continue recording for CLIP_DURATION seconds after last motion
-            elif clip_recording:
-                if time.time() - last_motion_time < CLIP_DURATION:
+
+                # Start recording
+                detector.start_clip_recording(frame)
+                detector.add_frame_to_clip(frame)
+
+                # Record for CLIP_DURATION seconds
+                record_start = time.time()
+                while time.time() - record_start < CLIP_DURATION:
+                    ret, frame = detector.camera.read()
+                    if not ret:
+                        logger.error("Failed to read frame during recording")
+                        break
                     detector.add_frame_to_clip(frame)
-                else:
-                    # Stop recording and transcode to H.264 for browser compatibility
-                    clip_path, duration = detector.stop_clip_recording()
-                    clip_recording = False
+                    time.sleep(0.05)
 
-                    if clip_path:
-                        # Transcode to H.264 before uploading
-                        transcoded_path = transcode_to_h264(clip_path)
-                        if transcoded_path:
-                            clip_path = transcoded_path
-                        else:
-                            logger.warning(f"Transcoding failed, uploading original: {clip_path}")
+                # Stop recording
+                clip_path, duration = detector.stop_clip_recording()
 
-                        # Upload to S3
-                        if s3_uploader and S3_UPLOAD_ON_MOTION:
-                            if not s3_uploader.upload_motion_clip(clip_path, duration, motion_score=0):
-                                raise RuntimeError(f"Failed to upload motion clip to S3: {clip_path}")
-            
+                if clip_path:
+                    # Transcode to H.264 for browser compatibility
+                    transcoded_path = transcode_to_h264(clip_path)
+                    if transcoded_path:
+                        clip_path = transcoded_path
+                    else:
+                        logger.warning(f"Transcoding failed, uploading original: {clip_path}")
+
+                    # Upload to S3
+                    if s3_uploader and S3_UPLOAD_ON_MOTION:
+                        if not s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score):
+                            raise RuntimeError(f"Failed to upload motion clip to S3: {clip_path}")
+
             # Small delay to prevent CPU overload
             time.sleep(0.05)
-    
+
     except KeyboardInterrupt:
         logger.info("Stopping motion detection...")
     except Exception as e:
         logger.error(f"Fatal error in motion detection: {e}")
         raise
     finally:
-        if clip_recording:
-            detector.stop_clip_recording()
         detector.release()
         logger.info("Motion detection stopped")
 
