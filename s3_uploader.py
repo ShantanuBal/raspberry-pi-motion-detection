@@ -116,57 +116,50 @@ class S3Uploader:
         # Ensure credentials are valid before uploading
         self._ensure_valid_credentials()
         
-        try:
-            # Generate S3 key if not provided
-            if s3_key is None:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = Path(local_path).name
-                file_ext = Path(local_path).suffix
-                s3_key = f"motion_detections/{timestamp}{file_ext}"
-            
-            # Prepare metadata
-            extra_args = {}
-            if metadata:
-                extra_args['Metadata'] = {str(k): str(v) for k, v in metadata.items()}
-            
-            # Upload file
-            self.s3_client.upload_file(
-                local_path,
-                self.bucket_name,
-                s3_key,
-                ExtraArgs=extra_args
-            )
-            
-            s3_url = f"s3://{self.bucket_name}/{s3_key}"
-            logger.info(f"Successfully uploaded {local_path} to {s3_url}")
-            return True
-            
-        except ClientError as e:
-            error_code = e.response.get('Error', {}).get('Code', '')
-            # If token expired, refresh and retry once
-            if error_code == 'ExpiredToken' and self.role_arn:
-                logger.warning("Token expired, refreshing credentials and retrying...")
-                self._refresh_s3_client()
-                # Retry the upload
-                try:
-                    self.s3_client.upload_file(
-                        local_path,
-                        self.bucket_name,
-                        s3_key,
-                        ExtraArgs=extra_args
-                    )
-                    s3_url = f"s3://{self.bucket_name}/{s3_key}"
-                    logger.info(f"Successfully uploaded {local_path} to {s3_url} (after refresh)")
-                    return True
-                except Exception as retry_error:
-                    logger.error(f"Error uploading {local_path} to S3 after refresh: {retry_error}")
-                    raise RuntimeError(f"S3 upload failed after credential refresh: {retry_error}") from retry_error
-            else:
+        # Generate S3 key if not provided
+        if s3_key is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = Path(local_path).name
+            file_ext = Path(local_path).suffix
+            s3_key = f"motion_detections/{timestamp}{file_ext}"
+        
+        # Prepare metadata
+        extra_args = {}
+        if metadata:
+            extra_args['Metadata'] = {str(k): str(v) for k, v in metadata.items()}
+        
+        # Attempt upload with retry on token expiration
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                # Upload file
+                self.s3_client.upload_file(
+                    local_path,
+                    self.bucket_name,
+                    s3_key,
+                    ExtraArgs=extra_args
+                )
+                
+                s3_url = f"s3://{self.bucket_name}/{s3_key}"
+                logger.info(f"Successfully uploaded {local_path} to {s3_url}")
+                return True
+                
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                # If token expired, refresh and retry once
+                if error_code == 'ExpiredToken' and self.role_arn and attempt < max_retries - 1:
+                    logger.warning("Token expired, refreshing credentials and retrying...")
+                    self._refresh_s3_client()
+                    continue  # Retry the upload
+                else:
+                    logger.error(f"Error uploading {local_path} to S3: {e}")
+                    raise RuntimeError(f"S3 upload failed: {e}") from e
+            except Exception as e:
                 logger.error(f"Error uploading {local_path} to S3: {e}")
                 raise RuntimeError(f"S3 upload failed: {e}") from e
-        except Exception as e:
-            logger.error(f"Error uploading {local_path} to S3: {e}")
-            raise RuntimeError(f"S3 upload failed: {e}") from e
+        
+        # Should never reach here, but just in case
+        raise RuntimeError(f"S3 upload failed after {max_retries} attempts")
     
     def upload_motion_image(self, image_path: str, motion_score: Optional[float] = None) -> bool:
         """
