@@ -25,7 +25,7 @@ MOTION_THRESHOLD = float(os.getenv('MOTION_THRESHOLD', '5000.0'))  # Adjust base
 MIN_MOTION_AREA = int(os.getenv('MIN_MOTION_AREA', '500'))  # Minimum area to consider as motion (2% of 1280x720 frame)
 SAVE_IMAGES = os.getenv('SAVE_IMAGES', 'true').lower() == 'true'
 SAVE_CLIPS = os.getenv('SAVE_CLIPS', 'true').lower() == 'true'
-CLIP_DURATION = int(os.getenv('CLIP_DURATION', '30'))  # Seconds to record after motion
+CLIP_DURATION = int(os.getenv('CLIP_DURATION', '10'))  # Seconds to record after motion
 
 # File Paths
 OUTPUT_DIR = Path(os.getenv('OUTPUT_DIR', '~/motion_detections'))
@@ -36,7 +36,7 @@ WEB_PORT = int(os.getenv('WEB_PORT', '8000'))
 WEB_REFRESH_INTERVAL = int(os.getenv('WEB_REFRESH_INTERVAL', '1'))  # seconds
 
 # S3 Upload Settings
-UPLOAD_TO_S3 = os.getenv('UPLOAD_TO_S3', 'false').lower() == 'true'
+UPLOAD_TO_S3 = os.getenv('UPLOAD_TO_S3', 'true').lower() == 'true'
 S3_UPLOAD_ON_MOTION = os.getenv('S3_UPLOAD_ON_MOTION', 'true').lower() == 'true'
 
 # Optional: AWS SNS for notifications
