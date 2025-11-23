@@ -6,7 +6,8 @@ Uploads motion-detected clips/images to S3 bucket
 import boto3
 import os
 import logging
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from botocore.exceptions import ClientError
@@ -37,6 +38,7 @@ class S3Uploader:
         self.bucket_name = bucket_name
         self.region = region
         self.role_arn = role_arn
+        self.credentials_expiry = None  # Track when credentials expire
         
         # Initialize S3 client
         self._refresh_s3_client()
@@ -62,6 +64,10 @@ class S3Uploader:
                 )
                 credentials = response['Credentials']
                 
+                # Store expiration time (refresh 5 minutes before expiry)
+                self.credentials_expiry = credentials['Expiration']
+                refresh_time = self.credentials_expiry - timedelta(minutes=5)
+                
                 # Create S3 client with temporary credentials
                 self.s3_client = boto3.client(
                     's3',
@@ -70,13 +76,23 @@ class S3Uploader:
                     aws_secret_access_key=credentials['SecretAccessKey'],
                     aws_session_token=credentials['SessionToken']
                 )
-                logger.info(f"Assumed IAM role: {self.role_arn}")
+                logger.info(f"Assumed IAM role: {self.role_arn} (expires at {self.credentials_expiry})")
             except ClientError as e:
                 logger.error(f"Failed to assume role {self.role_arn}: {e}")
                 raise
         else:
-            # Use direct credentials from environment
+            # Use direct credentials from environment (no expiration)
             self.s3_client = boto3.client('s3', region_name=self.region)
+            self.credentials_expiry = None
+    
+    def _ensure_valid_credentials(self):
+        """Refresh credentials if they're expired or about to expire"""
+        if self.role_arn and self.credentials_expiry:
+            # Refresh 5 minutes before expiry
+            refresh_time = self.credentials_expiry - timedelta(minutes=5)
+            if datetime.now(self.credentials_expiry.tzinfo) >= refresh_time:
+                logger.info("Credentials expiring soon, refreshing...")
+                self._refresh_s3_client()
     
     def upload_file(self, local_path: str, s3_key: Optional[str] = None, 
                    metadata: Optional[dict] = None) -> bool:
@@ -96,6 +112,9 @@ class S3Uploader:
         """
         if not os.path.exists(local_path):
             raise FileNotFoundError(f"File not found: {local_path}")
+        
+        # Ensure credentials are valid before uploading
+        self._ensure_valid_credentials()
         
         try:
             # Generate S3 key if not provided
@@ -122,6 +141,29 @@ class S3Uploader:
             logger.info(f"Successfully uploaded {local_path} to {s3_url}")
             return True
             
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            # If token expired, refresh and retry once
+            if error_code == 'ExpiredToken' and self.role_arn:
+                logger.warning("Token expired, refreshing credentials and retrying...")
+                self._refresh_s3_client()
+                # Retry the upload
+                try:
+                    self.s3_client.upload_file(
+                        local_path,
+                        self.bucket_name,
+                        s3_key,
+                        ExtraArgs=extra_args
+                    )
+                    s3_url = f"s3://{self.bucket_name}/{s3_key}"
+                    logger.info(f"Successfully uploaded {local_path} to {s3_url} (after refresh)")
+                    return True
+                except Exception as retry_error:
+                    logger.error(f"Error uploading {local_path} to S3 after refresh: {retry_error}")
+                    raise RuntimeError(f"S3 upload failed after credential refresh: {retry_error}") from retry_error
+            else:
+                logger.error(f"Error uploading {local_path} to S3: {e}")
+                raise RuntimeError(f"S3 upload failed: {e}") from e
         except Exception as e:
             logger.error(f"Error uploading {local_path} to S3: {e}")
             raise RuntimeError(f"S3 upload failed: {e}") from e
