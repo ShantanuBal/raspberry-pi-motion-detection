@@ -55,3 +55,5 @@ latest_motion.jpg
 # Logs
 *.log
 
+# Webapp
+webapp/.env*
