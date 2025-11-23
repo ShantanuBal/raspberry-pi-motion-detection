@@ -22,6 +22,14 @@ export class MotionDetectionStack extends cdk.Stack {
           enabled: true,
         },
       ],
+      cors: [
+        {
+          allowedHeaders: ['*'],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+          allowedOrigins: ['http://localhost:3000', 'https://raspberry-pi-motion-detection.vercel.app'],
+          exposedHeaders: [],
+        },
+      ],
     });
 
     // IAM User for the Raspberry Pi
