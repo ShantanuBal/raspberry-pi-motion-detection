@@ -89,18 +89,9 @@ class MotionDetector:
         
         return motion_detected, motion_score, max_area
     
-    def save_image(self, frame, motion_score):
-        """Save motion-detected image"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = OUTPUT_DIR / f"motion_{timestamp}.jpg"
-        
-        cv2.imwrite(str(filename), frame)
-        
-        # Also save as latest_motion.jpg for web dashboard
+    def save_latest_image(self, frame):
+        """Save latest motion image for web dashboard only"""
         cv2.imwrite(str(LATEST_IMAGE_PATH), frame)
-        
-        logger.info(f"Saved motion image: {filename} (score: {motion_score:.0f})")
-        return str(filename)
     
     def start_clip_recording(self, frame):
         """Start recording a video clip"""
@@ -276,9 +267,8 @@ def main():
                     clip_filename = detector.start_clip_recording(frame)
                     clip_recording = True
                 
-                # Save image locally (for web dashboard)
-                if SAVE_IMAGES:
-                    detector.save_image(frame, motion_score)
+                # Save latest image for web dashboard only
+                detector.save_latest_image(frame)
                 
                 # Add frame to clip
                 if clip_recording:
