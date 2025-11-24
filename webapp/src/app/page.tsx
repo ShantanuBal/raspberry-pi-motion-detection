@@ -31,17 +31,24 @@ export default function HomePage() {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalVideos, setTotalVideos] = useState(0);
 
   useEffect(() => {
-    fetchVideos();
+    fetchVideos(0);
   }, []);
 
-  const fetchVideos = async () => {
+  const fetchVideos = async (page: number) => {
+    setLoading(true);
     try {
-      const response = await fetch("/api/videos");
+      const response = await fetch(`/api/videos?page=${page}`);
       if (!response.ok) throw new Error("Failed to fetch videos");
       const data = await response.json();
       setVideos(data.videos);
+      setCurrentPage(page);
+      setHasMore(data.hasMore);
+      setTotalVideos(data.total || 0);
     } catch (err) {
       setError("Failed to load videos");
       console.error(err);
@@ -154,10 +161,10 @@ export default function HomePage() {
           <div className="grid gap-4">
             <div className="flex justify-between items-center mb-2">
               <div className="text-gray-400 text-sm">
-                {videos.length} video{videos.length !== 1 ? "s" : ""} found
+                Showing {currentPage * 10 + 1}-{Math.min((currentPage + 1) * 10, totalVideos)} of {totalVideos} video{totalVideos !== 1 ? "s" : ""}
               </div>
               <button
-                onClick={fetchVideos}
+                onClick={() => fetchVideos(currentPage)}
                 className="p-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
                 title="Refresh"
               >
@@ -196,6 +203,54 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
+            {/* Pagination */}
+            <div className="flex justify-center items-center gap-4 mt-4">
+              <button
+                onClick={() => fetchVideos(currentPage - 1)}
+                disabled={currentPage === 0}
+                className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Previous Page"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+              <span className="text-gray-400 text-sm">
+                Page {currentPage + 1} of {Math.ceil(totalVideos / 10)}
+              </span>
+              <button
+                onClick={() => fetchVideos(currentPage + 1)}
+                disabled={!hasMore}
+                className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Next Page"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </main>

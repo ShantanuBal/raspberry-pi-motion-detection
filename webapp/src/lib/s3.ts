@@ -1,6 +1,5 @@
-import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { S3Client, ListObjectsV2Command, ListObjectsV2CommandOutput, _Object, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || "us-west-2",
@@ -19,29 +18,63 @@ export interface VideoFile {
   size: number;
 }
 
-export async function listVideos(): Promise<VideoFile[]> {
-  const command = new ListObjectsV2Command({
-    Bucket: BUCKET_NAME,
-    Prefix: "motion_detections/", // Matches the prefix used by s3_uploader.py
-  });
+export interface PaginatedVideos {
+  videos: VideoFile[];
+  nextContinuationToken?: string;
+  hasMore: boolean;
+  total?: number;
+}
 
-  const response = await s3Client.send(command);
+const PAGE_SIZE = 10;
 
-  if (!response.Contents) {
-    return [];
-  }
+export async function listVideos(continuationToken?: string): Promise<PaginatedVideos> {
+  // S3 doesn't support sorting, so we need to fetch all and sort client-side
+  // For pagination with sorting by date, we fetch all keys first, then paginate
+  const allVideos: VideoFile[] = [];
+  let nextToken: string | undefined = undefined;
 
-  const videos = response.Contents
-    .filter((obj) => obj.Key?.endsWith(".mp4"))
-    .map((obj) => ({
-      key: obj.Key || "",
-      name: obj.Key?.split("/").pop() || "",
-      lastModified: obj.LastModified || new Date(),
-      size: obj.Size || 0,
-    }))
-    .sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+  // Fetch all objects to sort by date (S3 doesn't support sorted listing)
+  do {
+    const command = new ListObjectsV2Command({
+      Bucket: BUCKET_NAME,
+      Prefix: "motion_detections/",
+      ContinuationToken: nextToken,
+    });
 
-  return videos;
+    const response: ListObjectsV2CommandOutput = await s3Client.send(command);
+
+    if (response.Contents) {
+      const videos = response.Contents
+        .filter((obj: _Object) => obj.Key?.endsWith(".mp4"))
+        .map((obj: _Object) => ({
+          key: obj.Key || "",
+          name: obj.Key?.split("/").pop() || "",
+          lastModified: obj.LastModified || new Date(),
+          size: obj.Size || 0,
+        }));
+      allVideos.push(...videos);
+    }
+
+    nextToken = response.NextContinuationToken;
+  } while (nextToken);
+
+  // Sort by date descending (newest first)
+  allVideos.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+
+  // Parse continuation token as page number (0-indexed)
+  const page = continuationToken ? parseInt(continuationToken, 10) : 0;
+  const startIndex = page * PAGE_SIZE;
+  const endIndex = startIndex + PAGE_SIZE;
+
+  const paginatedVideos = allVideos.slice(startIndex, endIndex);
+  const hasMore = endIndex < allVideos.length;
+
+  return {
+    videos: paginatedVideos,
+    nextContinuationToken: hasMore ? String(page + 1) : undefined,
+    hasMore,
+    total: allVideos.length,
+  };
 }
 
 export async function getPresignedUrl(key: string): Promise<string> {

@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { listVideos } from "@/lib/s3";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -11,8 +11,11 @@ export async function GET() {
   }
 
   try {
-    const videos = await listVideos();
-    return NextResponse.json({ videos });
+    const { searchParams } = new URL(request.url);
+    const page = searchParams.get("page") || undefined;
+
+    const result = await listVideos(page);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error listing videos:", error);
     return NextResponse.json(
