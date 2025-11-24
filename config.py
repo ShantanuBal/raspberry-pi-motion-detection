@@ -25,7 +25,7 @@ MOTION_THRESHOLD = float(os.getenv('MOTION_THRESHOLD', '5000.0'))  # Adjust base
 MIN_MOTION_AREA = int(os.getenv('MIN_MOTION_AREA', '500'))  # Minimum area to consider as motion (2% of 1280x720 frame)
 SAVE_IMAGES = os.getenv('SAVE_IMAGES', 'true').lower() == 'true'
 SAVE_CLIPS = os.getenv('SAVE_CLIPS', 'true').lower() == 'true'
-CLIP_DURATION = int(os.getenv('CLIP_DURATION', '10'))  # Seconds to record after motion
+CLIP_DURATION = int(os.getenv('CLIP_DURATION', '15'))  # Seconds to record after motion
 
 # File Paths
 OUTPUT_DIR = Path(os.getenv('OUTPUT_DIR', '~/motion_detections'))
