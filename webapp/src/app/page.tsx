@@ -138,7 +138,7 @@ export default function HomePage() {
                 d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
               />
             </svg>
-            Shantanu's Home Motion Detector
+            Shantanu&apos;s Home Motion Detector
           </h1>
           <div className="flex items-center gap-4">
             <span className="text-gray-400 text-sm">{session.user?.email}</span>
@@ -353,10 +353,10 @@ export default function HomePage() {
       <footer className="bg-gray-800 border-t border-gray-700 mt-auto">
         <div className="max-w-7xl mx-auto px-4 py-4 text-center">
           <p className="text-gray-500 text-xs">
-            Shantanu's Home Motion Detector v1.0.0 | Powered by a Raspberry Pi, questionable code, and an unhealthy amount of caffeine
+            Shantanu&apos;s Home Motion Detector v1.0.0 | Powered by a Raspberry Pi, questionable code, and an unhealthy amount of caffeine
           </p>
           <p className="text-gray-600 text-xs mt-1">
-            "I'm not paranoid, I just like knowing when squirrels are plotting against me"
+            &quot;I&apos;m not paranoid, I just like knowing when squirrels are plotting against me&quot;
           </p>
         </div>
       </footer>
