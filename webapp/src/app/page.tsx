@@ -242,16 +242,15 @@ export default function HomePage() {
               </button>
             </div>
             <div className="p-4">
-              {loadingVideo ? (
-                <div className="flex justify-center items-center h-64">
+              <div className="aspect-video bg-black rounded flex items-center justify-center">
+                {loadingVideo ? (
                   <div className="text-gray-400">Loading video...</div>
-                </div>
-              ) : videoUrl ? (
-                <video
-                  src={videoUrl}
-                  controls
-                  autoPlay
-                  className="w-full rounded"
+                ) : videoUrl ? (
+                  <video
+                    src={videoUrl}
+                    controls
+                    autoPlay
+                    className="w-full h-full rounded"
                   onLoadStart={() => console.log("[video] Load started, S3 URL:", videoUrl)}
                   onLoadedData={() => console.log("[video] Data loaded")}
                   onCanPlay={() => console.log("[video] Can play")}
@@ -265,10 +264,9 @@ export default function HomePage() {
                   Your browser does not support the video tag.
                 </video>
               ) : (
-                <div className="flex justify-center items-center h-64">
                   <div className="text-red-400">Failed to load video</div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
