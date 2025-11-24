@@ -79,6 +79,25 @@ export default function HomePage() {
     setVideoUrl(null);
   };
 
+  const getCurrentVideoIndex = () => {
+    if (!selectedVideo) return -1;
+    return videos.findIndex((v) => v.key === selectedVideo.key);
+  };
+
+  const playPreviousVideo = () => {
+    const currentIndex = getCurrentVideoIndex();
+    if (currentIndex > 0) {
+      playVideo(videos[currentIndex - 1]);
+    }
+  };
+
+  const playNextVideo = () => {
+    const currentIndex = getCurrentVideoIndex();
+    if (currentIndex < videos.length - 1) {
+      playVideo(videos[currentIndex + 1]);
+    }
+  };
+
   if (!session) {
     return null;
   }
@@ -148,7 +167,23 @@ export default function HomePage() {
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg max-w-4xl w-full mx-4 overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b border-gray-700">
-              <h2 className="text-white font-medium">{selectedVideo.name}</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={playPreviousVideo}
+                  disabled={getCurrentVideoIndex() <= 0}
+                  className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={playNextVideo}
+                  disabled={getCurrentVideoIndex() >= videos.length - 1}
+                  className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              <h2 className="text-white font-medium flex-1 text-center">{selectedVideo.name}</h2>
               <button
                 onClick={closeVideo}
                 className="text-gray-400 hover:text-white text-2xl leading-none"
