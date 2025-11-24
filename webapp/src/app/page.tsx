@@ -20,7 +20,16 @@ function formatBytes(bytes: number): string {
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleString();
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "America/Los_Angeles",
+    timeZoneName: "short",
+  });
 }
 
 export default function HomePage() {
@@ -191,12 +200,9 @@ export default function HomePage() {
                 className="bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg p-4 cursor-pointer transition-colors hover:border-gray-600"
               >
                 <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-white font-medium">{video.name}</h3>
-                    <p className="text-gray-400 text-sm mt-1">
-                      {formatDate(video.lastModified)}
-                    </p>
-                  </div>
+                  <h3 className="text-white font-medium">
+                    {formatDate(video.lastModified)}
+                  </h3>
                   <div className="text-gray-500 text-sm">
                     {formatBytes(video.size)}
                   </div>
@@ -304,7 +310,7 @@ export default function HomePage() {
                   </svg>
                 </button>
               </div>
-              <h2 className="text-white font-medium flex-1 text-center">{selectedVideo.name}</h2>
+              <h2 className="text-white font-medium flex-1 text-center">{formatDate(selectedVideo.lastModified)}</h2>
               <button
                 onClick={closeVideo}
                 className="text-gray-400 hover:text-white text-2xl leading-none"
