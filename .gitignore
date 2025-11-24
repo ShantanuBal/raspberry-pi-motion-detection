@@ -57,3 +57,4 @@ latest_motion.jpg
 
 # Webapp
 webapp/.env*
+.vercel
