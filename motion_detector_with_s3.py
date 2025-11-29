@@ -11,12 +11,12 @@ import os
 from datetime import datetime
 from pathlib import Path
 import logging
-import boto3
 import threading
 
 # Import our modules
 from config import *
 from s3_uploader import S3Uploader
+from lib.cloudwatch_client import CloudWatchClient
 
 # Configure logging
 logging.basicConfig(
@@ -25,36 +25,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Add CloudWatch handler if enabled
-try:
-    from watchtower import CloudWatchLogHandler
-
-    # Create CloudWatch Logs client
-    cloudwatch_client = boto3.client('logs', region_name=AWS_REGION)
-
-    # Add CloudWatch handler to logger
-    cloudwatch_handler = CloudWatchLogHandler(
-        log_group='/raspberry-pi/motion-detection',
-        stream_name=f'motion-detector-{datetime.now().strftime("%Y%m%d")}',
-        boto3_client=cloudwatch_client,
-        send_interval=5,  # Send logs every 5 seconds
-        create_log_group=True  # Automatically create log group if it doesn't exist
-    )
-    cloudwatch_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    logger.addHandler(cloudwatch_handler)
-    logger.info("CloudWatch logging enabled")
-except ImportError:
-    logger.warning("watchtower not installed - CloudWatch logging disabled")
-except Exception as e:
-    logger.warning(f"Failed to initialize CloudWatch logging: {e}")
-
-# Create CloudWatch Metrics client
-try:
-    cloudwatch_metrics = boto3.client('cloudwatch', region_name=AWS_REGION)
-    logger.info("CloudWatch Metrics client initialized")
-except Exception as e:
-    cloudwatch_metrics = None
-    logger.warning(f"Failed to initialize CloudWatch Metrics: {e}")
+# CloudWatch client (will be initialized in main())
+cloudwatch = None
 
 # Ensure output directory exists
 OUTPUT_DIR = Path(OUTPUT_DIR).expanduser()
@@ -63,27 +35,10 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def send_cloudwatch_metric(metric_name, value=1.0, unit='Count', dimensions=None):
     """Send a custom metric to CloudWatch"""
-    if cloudwatch_metrics is None:
+    if cloudwatch is None:
         return
 
-    try:
-        metric_data = {
-            'MetricName': metric_name,
-            'Value': value,
-            'Unit': unit,
-            'Timestamp': datetime.utcnow()
-        }
-
-        if dimensions:
-            metric_data['Dimensions'] = dimensions
-
-        cloudwatch_metrics.put_metric_data(
-            Namespace='RaspberryPi/MotionDetection',
-            MetricData=[metric_data]
-        )
-        logger.debug(f"Sent CloudWatch metric: {metric_name}={value}")
-    except Exception as e:
-        logger.warning(f"Failed to send CloudWatch metric {metric_name}: {e}")
+    cloudwatch.send_metric(metric_name, value, unit, dimensions=dimensions)
 
 
 def heartbeat_thread():
@@ -279,12 +234,29 @@ def transcode_to_h264(input_path: str) -> str:
 
 def main():
     """Main motion detection loop"""
+    global cloudwatch
+
     logger.info("=== Motion Detection System Starting ===")
     logger.info(f"Configuration: S3={UPLOAD_TO_S3}, Bucket={S3_BUCKET_NAME}, Region={AWS_REGION}")
     logger.info(f"Settings: Clip Duration={CLIP_DURATION}s, Min Motion Area={MIN_MOTION_AREA}px")
 
+    # Initialize CloudWatch client
+    logger.info("Initializing CloudWatch client...")
+    cloudwatch = CloudWatchClient(
+        region=AWS_REGION,
+        role_arn=IAM_ROLE_ARN if IAM_ROLE_ARN else None
+    )
+
+    # Add CloudWatch log handler to logger
+    log_handler = cloudwatch.get_log_handler(
+        log_group='/raspberry-pi/motion-detection',
+        stream_name=f'motion-detector-{datetime.now().strftime("%Y%m%d")}'
+    )
+    if log_handler:
+        logger.addHandler(log_handler)
+
     # Start heartbeat thread
-    if cloudwatch_metrics:
+    if cloudwatch:
         heartbeat = threading.Thread(target=heartbeat_thread, daemon=True)
         heartbeat.start()
         logger.info("Heartbeat thread started (5-minute interval)")

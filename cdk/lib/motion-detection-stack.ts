@@ -50,6 +50,35 @@ export class MotionDetectionStack extends cdk.Stack {
     bucket.grantWrite(uploadRole);
     bucket.grantRead(uploadRole); // Allows ListBucket for verification
 
+    // Grant CloudWatch Logs permissions
+    uploadRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'logs:CreateLogGroup',
+        'logs:CreateLogStream',
+        'logs:PutLogEvents',
+        'logs:DescribeLogStreams',
+      ],
+      resources: [
+        `arn:aws:logs:${this.region}:${this.account}:log-group:/raspberry-pi/motion-detection`,
+        `arn:aws:logs:${this.region}:${this.account}:log-group:/raspberry-pi/motion-detection:*`,
+      ],
+    }));
+
+    // Grant CloudWatch Metrics permissions
+    uploadRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'cloudwatch:PutMetricData',
+      ],
+      resources: ['*'], // CloudWatch metrics don't support resource-level permissions
+      conditions: {
+        StringEquals: {
+          'cloudwatch:namespace': 'RaspberryPi/MotionDetection',
+        },
+      },
+    }));
+
     // IAM User for Vercel webapp (read-only access)
     const vercelUser = new iam.User(this, 'MotionViewerVercelUser', {
       userName: 'motion-viewer-vercel-user',
