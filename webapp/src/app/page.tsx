@@ -1,7 +1,9 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
+import Footer from "@/components/Footer";
+import Header from "@/components/Header";
 
 interface Video {
   key: string;
@@ -120,37 +122,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-              />
-            </svg>
-            Shantanu&apos;s Home Motion Detector
-          </h1>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-400 text-sm">{session.user?.email}</span>
-            <button
-              onClick={() => signOut()}
-              className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header session={session} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
@@ -373,17 +345,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="bg-gray-800 border-t border-gray-700 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 py-4 text-center">
-          <p className="text-gray-500 text-xs">
-            Shantanu&apos;s Home Motion Detector v1.0.0 | Powered by a Raspberry Pi, questionable code, and an unhealthy amount of caffeine
-          </p>
-          <p className="text-gray-600 text-xs mt-1">
-            &quot;I&apos;m not paranoid, I just like knowing when squirrels are plotting against me&quot;
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

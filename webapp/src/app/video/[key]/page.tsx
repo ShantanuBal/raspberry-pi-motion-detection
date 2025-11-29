@@ -3,20 +3,8 @@
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "America/Los_Angeles",
-    timeZoneName: "short",
-  });
-}
+import Footer from "@/components/Footer";
+import Header from "@/components/Header";
 
 export default function VideoPage() {
   const { data: session, status } = useSession();
@@ -25,7 +13,6 @@ export default function VideoPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [videoKey, setVideoKey] = useState<string>("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -45,10 +32,6 @@ export default function VideoPage() {
       if (!response.ok) throw new Error("Failed to get video URL");
       const data = await response.json();
       setVideoUrl(data.url);
-
-      // Decode the key to get the original filename
-      const decodedKey = Buffer.from(encodedKey, "base64").toString("utf-8");
-      setVideoKey(decodedKey);
     } catch (err) {
       setError("Failed to load video");
       console.error(err);
@@ -69,63 +52,9 @@ export default function VideoPage() {
     return null;
   }
 
-  // Extract date from filename if possible
-  const getDateFromKey = (key: string) => {
-    // Clean up any potential encoding issues
-    const cleanKey = key.replace(/[^\x20-\x7E]/g, '').trim();
-
-    // Try to parse date from filename like "20251128_155004.mp4"
-    const match = cleanKey.match(/(\d{8})_(\d{6})/);
-    if (match) {
-      const dateStr = match[1]; // YYYYMMDD
-      const timeStr = match[2]; // HHMMSS
-
-      const year = dateStr.substring(0, 4);
-      const month = dateStr.substring(4, 6);
-      const day = dateStr.substring(6, 8);
-      const hour = timeStr.substring(0, 2);
-      const minute = timeStr.substring(2, 4);
-      const second = timeStr.substring(4, 6);
-
-      const isoDate = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-      return formatDate(isoDate);
-    }
-
-    // Fallback: return cleaned filename without extension
-    return cleanKey.replace(/\.mp4$/, '').replace(/motion_detections\//, '');
-  };
-
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
-      {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <button
-            onClick={() => router.push("/")}
-            className="text-gray-400 hover:text-white flex items-center gap-2"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            <span>Back to Videos</span>
-          </button>
-          <h1 className="text-xl font-bold text-white">
-            {videoKey ? getDateFromKey(videoKey) : "Video"}
-          </h1>
-          <div className="w-32"></div> {/* Spacer for centering */}
-        </div>
-      </header>
+      <Header session={session} showHomeButton={true} />
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center p-4">
@@ -157,6 +86,8 @@ export default function VideoPage() {
           <div className="text-gray-400">Loading video...</div>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }
