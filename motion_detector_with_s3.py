@@ -3,8 +3,6 @@ Enhanced Motion Detection System with S3 Upload
 Detects motion, saves clips/images, and uploads to AWS S3
 """
 
-import cv2
-import numpy as np
 import time
 import subprocess
 import os
@@ -15,8 +13,9 @@ import threading
 
 # Import our modules
 from config import *
-from s3_uploader import S3Uploader
 from lib.cloudwatch_client import CloudWatchClient
+from lib.motion_detector import MotionDetector
+from lib.s3_uploader import S3Uploader
 
 # Configure logging
 logging.basicConfig(
@@ -33,136 +32,15 @@ OUTPUT_DIR = Path(OUTPUT_DIR).expanduser()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def send_cloudwatch_metric(metric_name, value=1.0, unit='Count', dimensions=None):
-    """Send a custom metric to CloudWatch"""
-    if cloudwatch is None:
-        return
-
-    cloudwatch.send_metric(metric_name, value, unit, dimensions=dimensions)
-
-
 def heartbeat_thread():
     """Background thread that sends a heartbeat metric every 5 minutes"""
     while True:
         try:
             time.sleep(300)  # 5 minutes
-            send_cloudwatch_metric('SystemHeartbeat', value=1.0, unit='Count')
+            cloudwatch.send_metric('SystemHeartbeat', value=1.0, unit='Count')
             logger.debug("Heartbeat metric sent")
         except Exception as e:
             logger.error(f"Error in heartbeat thread: {e}")
-
-
-class MotionDetector:
-    """Motion detection using frame differencing"""
-    
-    def __init__(self, camera_index=0):
-        self.camera = cv2.VideoCapture(camera_index)
-        if not self.camera.isOpened():
-            raise RuntimeError(f"Could not open camera {camera_index}")
-        
-        # Set camera resolution (720p for C270)
-        self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        
-        # Initialize background subtractor
-        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
-            history=500, varThreshold=50, detectShadows=True
-        )
-        
-        # Read first frame to initialize
-        ret, self.prev_frame = self.camera.read()
-        if not ret:
-            raise RuntimeError("Could not read initial frame")
-        
-        self.prev_gray = cv2.cvtColor(self.prev_frame, cv2.COLOR_BGR2GRAY)
-        self.prev_gray_blur = cv2.GaussianBlur(self.prev_gray, (21, 21), 0)
-        self.motion_detected = False
-        self.motion_start_time = None
-        self.clip_writer = None
-        self.clip_frames = []
-        
-        logger.info("Motion detector initialized")
-    
-    def detect_motion(self, frame):
-        """Detect motion in current frame"""
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray_blur = cv2.GaussianBlur(gray, (21, 21), 0)
-        
-        # Calculate frame difference
-        frame_diff = cv2.absdiff(self.prev_gray_blur, gray_blur)
-        thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)[1]
-        thresh = cv2.dilate(thresh, None, iterations=2)
-        
-        # Find contours
-        contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        motion_detected = False
-        motion_score = 0.0
-        max_area = 0
-        
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if area > MIN_MOTION_AREA:
-                motion_detected = True
-                motion_score += area
-                max_area = max(max_area, area)
-        
-        self.prev_gray_blur = gray_blur
-        
-        return motion_detected, motion_score, max_area
-    
-    def start_clip_recording(self, frame):
-        """Start recording a video clip"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = OUTPUT_DIR / f"motion_clip_{timestamp}.mp4"
-        
-        # Get frame dimensions
-        height, width = frame.shape[:2]
-        fps = 20  # Frames per second
-        
-        # Initialize video writer with mp4v codec (will be transcoded to H.264 later)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        self.clip_writer = cv2.VideoWriter(
-            str(filename), fourcc, fps, (width, height)
-        )
-
-        if not self.clip_writer.isOpened():
-            logger.error("Failed to open video writer with mp4v codec!")
-            self.clip_writer = None
-        
-        self.clip_frames = []
-        self.motion_start_time = time.time()
-        
-        logger.info(f"Started recording clip: {filename}")
-        return str(filename)
-    
-    def add_frame_to_clip(self, frame):
-        """Add frame to current clip"""
-        if self.clip_writer is not None:
-            self.clip_writer.write(frame)
-            self.clip_frames.append(frame.copy())
-    
-    def stop_clip_recording(self):
-        """Stop recording and return clip filename"""
-        if self.clip_writer is not None:
-            self.clip_writer.release()
-            self.clip_writer = None
-            
-            duration = time.time() - self.motion_start_time if self.motion_start_time else 0
-            logger.info(f"Stopped recording clip (duration: {duration:.1f}s)")
-            
-            # Return the most recent clip file
-            clip_files = sorted(OUTPUT_DIR.glob("motion_clip_*.mp4"))
-            if clip_files:
-                return str(clip_files[-1]), duration
-        return None, 0
-    
-    def release(self):
-        """Release camera resources"""
-        if self.clip_writer is not None:
-            self.clip_writer.release()
-        self.camera.release()
-        cv2.destroyAllWindows()
 
 
 def transcode_to_h264(input_path: str) -> str:
@@ -256,10 +134,9 @@ def main():
         logger.addHandler(log_handler)
 
     # Start heartbeat thread
-    if cloudwatch:
-        heartbeat = threading.Thread(target=heartbeat_thread, daemon=True)
-        heartbeat.start()
-        logger.info("Heartbeat thread started (5-minute interval)")
+    heartbeat = threading.Thread(target=heartbeat_thread, daemon=True)
+    heartbeat.start()
+    logger.info("Heartbeat thread started (5-minute interval)")
 
     # Initialize S3 uploader if enabled
     s3_uploader = None
@@ -273,11 +150,14 @@ def main():
         logger.info("S3 uploader initialized successfully")
 
     # Initialize motion detector
-    detector = MotionDetector()
+    detector = MotionDetector(
+        output_dir=OUTPUT_DIR,
+        min_motion_area=MIN_MOTION_AREA
+    )
 
     try:
         logger.info("Starting motion detection loop - waiting for motion...")
-        send_cloudwatch_metric('SystemStartup', value=1.0, unit='Count')
+        cloudwatch.send_metric('SystemStartup', value=1.0, unit='Count')
 
         while True:
             ret, frame = detector.camera.read()
@@ -289,7 +169,7 @@ def main():
 
             if motion_detected and SAVE_CLIPS:
                 logger.info(f"🎬 Motion detected! Score: {motion_score:.0f}, Max Area: {max_area:.0f}px")
-                send_cloudwatch_metric('MotionDetected', value=1.0, unit='Count')
+                cloudwatch.send_metric('MotionDetected', value=1.0, unit='Count')
 
                 # Start recording
                 clip_filename = detector.start_clip_recording(frame)
@@ -338,22 +218,21 @@ def main():
                             logger.info(f"✅ Upload successful in {upload_time:.1f}s")
 
                             # Send CloudWatch metrics
-                            send_cloudwatch_metric('VideoUploaded', value=1.0, unit='Count')
-                            send_cloudwatch_metric('UploadDuration', value=upload_time, unit='Seconds')
-                            send_cloudwatch_metric('VideoSize', value=transcoded_size_mb, unit='Megabytes')
-                            send_cloudwatch_metric('MotionScore', value=motion_score, unit='None')
+                            cloudwatch.send_metric('VideoUploaded', value=1.0, unit='Count')
+                            cloudwatch.send_metric('UploadDuration', value=upload_time, unit='Seconds')
+                            cloudwatch.send_metric('VideoSize', value=transcoded_size_mb, unit='Megabytes')
+                            cloudwatch.send_metric('MotionScore', value=motion_score, unit='None')
                         else:
                             logger.error(f"❌ Upload failed: {clip_path}")
-                            send_cloudwatch_metric('UploadFailed', value=1.0, unit='Count')
+                            cloudwatch.send_metric('UploadFailed', value=1.0, unit='Count')
                             raise RuntimeError(f"Failed to upload motion clip to S3: {clip_path}")
 
                     logger.info("Motion event processing complete - resuming detection")
 
-                # Reset prev_gray to avoid false positive on next detection
+                # Reset background to avoid false positive on next detection
                 ret, frame = detector.camera.read()
                 if ret:
-                    detector.prev_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                    detector.prev_gray_blur = cv2.GaussianBlur(detector.prev_gray, (21, 21), 0)
+                    detector.reset_background(frame)
 
             # Small delay to prevent CPU overload
             time.sleep(0.05)
