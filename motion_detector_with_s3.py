@@ -11,6 +11,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 import logging
+import boto3
+import threading
 
 # Import our modules
 from config import *
@@ -23,9 +25,76 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Add CloudWatch handler if enabled
+try:
+    from watchtower import CloudWatchLogHandler
+
+    # Create CloudWatch Logs client
+    cloudwatch_client = boto3.client('logs', region_name=AWS_REGION)
+
+    # Add CloudWatch handler to logger
+    cloudwatch_handler = CloudWatchLogHandler(
+        log_group='/raspberry-pi/motion-detection',
+        stream_name=f'motion-detector-{datetime.now().strftime("%Y%m%d")}',
+        boto3_client=cloudwatch_client,
+        send_interval=5,  # Send logs every 5 seconds
+        create_log_group=True  # Automatically create log group if it doesn't exist
+    )
+    cloudwatch_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(cloudwatch_handler)
+    logger.info("CloudWatch logging enabled")
+except ImportError:
+    logger.warning("watchtower not installed - CloudWatch logging disabled")
+except Exception as e:
+    logger.warning(f"Failed to initialize CloudWatch logging: {e}")
+
+# Create CloudWatch Metrics client
+try:
+    cloudwatch_metrics = boto3.client('cloudwatch', region_name=AWS_REGION)
+    logger.info("CloudWatch Metrics client initialized")
+except Exception as e:
+    cloudwatch_metrics = None
+    logger.warning(f"Failed to initialize CloudWatch Metrics: {e}")
+
 # Ensure output directory exists
 OUTPUT_DIR = Path(OUTPUT_DIR).expanduser()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def send_cloudwatch_metric(metric_name, value=1.0, unit='Count', dimensions=None):
+    """Send a custom metric to CloudWatch"""
+    if cloudwatch_metrics is None:
+        return
+
+    try:
+        metric_data = {
+            'MetricName': metric_name,
+            'Value': value,
+            'Unit': unit,
+            'Timestamp': datetime.utcnow()
+        }
+
+        if dimensions:
+            metric_data['Dimensions'] = dimensions
+
+        cloudwatch_metrics.put_metric_data(
+            Namespace='RaspberryPi/MotionDetection',
+            MetricData=[metric_data]
+        )
+        logger.debug(f"Sent CloudWatch metric: {metric_name}={value}")
+    except Exception as e:
+        logger.warning(f"Failed to send CloudWatch metric {metric_name}: {e}")
+
+
+def heartbeat_thread():
+    """Background thread that sends a heartbeat metric every 5 minutes"""
+    while True:
+        try:
+            time.sleep(300)  # 5 minutes
+            send_cloudwatch_metric('SystemHeartbeat', value=1.0, unit='Count')
+            logger.debug("Heartbeat metric sent")
+        except Exception as e:
+            logger.error(f"Error in heartbeat thread: {e}")
 
 
 class MotionDetector:
@@ -210,6 +279,16 @@ def transcode_to_h264(input_path: str) -> str:
 
 def main():
     """Main motion detection loop"""
+    logger.info("=== Motion Detection System Starting ===")
+    logger.info(f"Configuration: S3={UPLOAD_TO_S3}, Bucket={S3_BUCKET_NAME}, Region={AWS_REGION}")
+    logger.info(f"Settings: Clip Duration={CLIP_DURATION}s, Min Motion Area={MIN_MOTION_AREA}px")
+
+    # Start heartbeat thread
+    if cloudwatch_metrics:
+        heartbeat = threading.Thread(target=heartbeat_thread, daemon=True)
+        heartbeat.start()
+        logger.info("Heartbeat thread started (5-minute interval)")
+
     # Initialize S3 uploader if enabled
     s3_uploader = None
     if UPLOAD_TO_S3:
@@ -220,52 +299,83 @@ def main():
             role_arn=IAM_ROLE_ARN if IAM_ROLE_ARN else None
         )
         logger.info("S3 uploader initialized successfully")
-    
+
     # Initialize motion detector
     detector = MotionDetector()
 
     try:
-        logger.info("Starting motion detection...")
+        logger.info("Starting motion detection loop - waiting for motion...")
+        send_cloudwatch_metric('SystemStartup', value=1.0, unit='Count')
+
         while True:
             ret, frame = detector.camera.read()
             if not ret:
-                logger.error("Failed to read frame")
+                logger.error("Failed to read frame from camera")
                 break
 
             motion_detected, motion_score, max_area = detector.detect_motion(frame)
 
             if motion_detected and SAVE_CLIPS:
-                logger.info(f"Motion detected! Score: {motion_score:.0f}, Area: {max_area:.0f}")
+                logger.info(f"🎬 Motion detected! Score: {motion_score:.0f}, Max Area: {max_area:.0f}px")
+                send_cloudwatch_metric('MotionDetected', value=1.0, unit='Count')
 
                 # Start recording
-                detector.start_clip_recording(frame)
+                clip_filename = detector.start_clip_recording(frame)
+                logger.info(f"Recording started: {Path(clip_filename).name}")
                 detector.add_frame_to_clip(frame)
 
                 # Record for CLIP_DURATION seconds
                 record_start = time.time()
+                frames_recorded = 1
                 while time.time() - record_start < CLIP_DURATION:
                     ret, frame = detector.camera.read()
                     if not ret:
                         logger.error("Failed to read frame during recording")
                         break
                     detector.add_frame_to_clip(frame)
+                    frames_recorded += 1
                     time.sleep(0.05)
 
                 # Stop recording
                 clip_path, duration = detector.stop_clip_recording()
+                logger.info(f"Recording complete: {frames_recorded} frames, {duration:.1f}s")
 
                 if clip_path:
+                    clip_size_mb = Path(clip_path).stat().st_size / (1024 * 1024)
+                    logger.info(f"Clip saved: {Path(clip_path).name} ({clip_size_mb:.2f} MB)")
+
                     # Transcode to H.264 for browser compatibility
+                    logger.info("Starting H.264 transcoding...")
+                    transcode_start = time.time()
                     transcoded_path = transcode_to_h264(clip_path)
                     if transcoded_path:
+                        transcode_time = time.time() - transcode_start
+                        transcoded_size_mb = Path(transcoded_path).stat().st_size / (1024 * 1024)
+                        logger.info(f"Transcoding complete in {transcode_time:.1f}s ({transcoded_size_mb:.2f} MB)")
                         clip_path = transcoded_path
                     else:
-                        logger.warning(f"Transcoding failed, uploading original: {clip_path}")
+                        logger.warning(f"Transcoding failed, will upload original file")
 
                     # Upload to S3
                     if s3_uploader and S3_UPLOAD_ON_MOTION:
-                        if not s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score):
+                        logger.info(f"Uploading to S3: s3://{S3_BUCKET_NAME}/motion_detections/{Path(clip_path).name}")
+                        upload_start = time.time()
+
+                        if s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score):
+                            upload_time = time.time() - upload_start
+                            logger.info(f"✅ Upload successful in {upload_time:.1f}s")
+
+                            # Send CloudWatch metrics
+                            send_cloudwatch_metric('VideoUploaded', value=1.0, unit='Count')
+                            send_cloudwatch_metric('UploadDuration', value=upload_time, unit='Seconds')
+                            send_cloudwatch_metric('VideoSize', value=transcoded_size_mb, unit='Megabytes')
+                            send_cloudwatch_metric('MotionScore', value=motion_score, unit='None')
+                        else:
+                            logger.error(f"❌ Upload failed: {clip_path}")
+                            send_cloudwatch_metric('UploadFailed', value=1.0, unit='Count')
                             raise RuntimeError(f"Failed to upload motion clip to S3: {clip_path}")
+
+                    logger.info("Motion event processing complete - resuming detection")
 
                 # Reset prev_gray to avoid false positive on next detection
                 ret, frame = detector.camera.read()
@@ -277,13 +387,13 @@ def main():
             time.sleep(0.05)
 
     except KeyboardInterrupt:
-        logger.info("Stopping motion detection...")
+        logger.info("Keyboard interrupt received - shutting down gracefully")
     except Exception as e:
-        logger.error(f"Fatal error in motion detection: {e}")
+        logger.error(f"💥 Fatal error in motion detection: {e}", exc_info=True)
         raise
     finally:
         detector.release()
-        logger.info("Motion detection stopped")
+        logger.info("=== Motion Detection System Stopped ===")
 
 
 if __name__ == "__main__":
