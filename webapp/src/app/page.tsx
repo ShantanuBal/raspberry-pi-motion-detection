@@ -10,6 +10,7 @@ interface Video {
   name: string;
   lastModified: string;
   size: number;
+  starred?: boolean;
 }
 
 function formatBytes(bytes: number): string {
@@ -45,10 +46,58 @@ export default function HomePage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [totalVideos, setTotalVideos] = useState(0);
+  const [starredVideoKeys, setStarredVideoKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchVideos(0);
+    fetchStarredVideos();
   }, []);
+
+  const fetchStarredVideos = async () => {
+    try {
+      const response = await fetch("/api/starred");
+      if (response.ok) {
+        const data = await response.json();
+        const starredKeys = new Set<string>(data.videos.map((v: any) => v.videoKey as string));
+        setStarredVideoKeys(starredKeys);
+      }
+    } catch (err) {
+      console.error("Failed to fetch starred videos:", err);
+    }
+  };
+
+  const toggleStar = async (video: Video, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent video from playing when clicking star
+
+    const isStarred = starredVideoKeys.has(video.key);
+    const action = isStarred ? "unstar" : "star";
+
+    try {
+      const response = await fetch("/api/starred", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          videoKey: video.key,
+          action,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        const newStarredKeys = new Set(starredVideoKeys);
+        if (isStarred) {
+          newStarredKeys.delete(video.key);
+        } else {
+          newStarredKeys.add(video.key);
+        }
+        setStarredVideoKeys(newStarredKeys);
+      }
+    } catch (err) {
+      console.error("Failed to toggle star:", err);
+    }
+  };
 
   const fetchVideos = async (page: number) => {
     setLoading(true);
@@ -175,8 +224,41 @@ export default function HomePage() {
                   <h3 className="text-white font-medium">
                     {formatDate(video.lastModified)}
                   </h3>
-                  <div className="text-gray-500 text-sm">
-                    {formatBytes(video.size)}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={(e) => toggleStar(video, e)}
+                      className="text-gray-400 hover:text-yellow-400 transition-colors"
+                      title={starredVideoKeys.has(video.key) ? "Unstar" : "Star"}
+                    >
+                      {starredVideoKeys.has(video.key) ? (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                    <div className="text-gray-500 text-sm">
+                      {formatBytes(video.size)}
+                    </div>
                   </div>
                 </div>
               </div>

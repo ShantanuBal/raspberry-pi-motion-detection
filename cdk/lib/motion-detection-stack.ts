@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 
 export class MotionDetectionStack extends cdk.Stack {
@@ -30,6 +31,36 @@ export class MotionDetectionStack extends cdk.Stack {
           exposedHeaders: [],
         },
       ],
+    });
+
+    // DynamoDB Table for starred videos
+    const starredVideosTable = new dynamodb.Table(this, 'StarredVideosTable', {
+      tableName: 'motion-detection-starred-videos',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'videoKey',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      pointInTimeRecovery: true,
+    });
+
+    // Add GSI to query all starred videos for a user sorted by timestamp
+    starredVideosTable.addGlobalSecondaryIndex({
+      indexName: 'UserTimestampIndex',
+      partitionKey: {
+        name: 'userId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'starredAt',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
     });
 
     // IAM User for the Raspberry Pi
@@ -87,6 +118,9 @@ export class MotionDetectionStack extends cdk.Stack {
     // Grant read-only access to the bucket for the Vercel user
     bucket.grantRead(vercelUser);
 
+    // Grant DynamoDB permissions to Vercel user for starred videos
+    starredVideosTable.grantReadWriteData(vercelUser);
+
     // Outputs
     new cdk.CfnOutput(this, 'BucketName', {
       value: bucket.bucketName,
@@ -111,6 +145,11 @@ export class MotionDetectionStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'VercelUserName', {
       value: vercelUser.userName,
       description: 'IAM user name for Vercel webapp (read-only access)',
+    });
+
+    new cdk.CfnOutput(this, 'StarredVideosTableName', {
+      value: starredVideosTable.tableName,
+      description: 'Name of the DynamoDB table for starred videos',
     });
 
     // Note: Access keys need to be created manually via AWS Console or CLI
