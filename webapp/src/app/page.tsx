@@ -309,6 +309,30 @@ export default function HomePage() {
                     />
                   </svg>
                 </button>
+                <button
+                  onClick={() => {
+                    const encodedKey = Buffer.from(selectedVideo.key).toString("base64");
+                    window.open(`/video/${encodedKey}`, '_blank');
+                  }}
+                  className="p-2 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors flex items-center gap-2"
+                  title="Open in New Tab"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                  <span className="text-xs">Open in New Tab</span>
+                </button>
               </div>
               <h2 className="text-white font-medium flex-1 text-center">{formatDate(selectedVideo.lastModified)}</h2>
               <button
