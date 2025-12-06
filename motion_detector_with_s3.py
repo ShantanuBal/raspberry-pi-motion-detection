@@ -160,7 +160,7 @@ def main():
         cloudwatch.send_metric('SystemStartup', value=1.0, unit='Count')
 
         while True:
-            ret, frame = detector.camera.read()
+            ret, frame = detector.read()
             if not ret:
                 logger.error("Failed to read frame from camera")
                 break
@@ -180,7 +180,7 @@ def main():
                 record_start = time.time()
                 frames_recorded = 1
                 while time.time() - record_start < CLIP_DURATION:
-                    ret, frame = detector.camera.read()
+                    ret, frame = detector.read()
                     if not ret:
                         logger.error("Failed to read frame during recording")
                         break
@@ -230,7 +230,7 @@ def main():
                     logger.info("Motion event processing complete - resuming detection")
 
                 # Reset background to avoid false positive on next detection
-                ret, frame = detector.camera.read()
+                ret, frame = detector.read()
                 if ret:
                     detector.reset_background(frame)
 

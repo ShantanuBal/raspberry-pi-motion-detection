@@ -1,6 +1,7 @@
 """
 Motion Detection Module
 Detects motion using frame differencing and records video clips
+Supports both USB webcams and Raspberry Pi Camera Module
 """
 
 import cv2
@@ -8,6 +9,7 @@ import time
 import logging
 from datetime import datetime
 from pathlib import Path
+from picamera2 import Picamera2
 
 logger = logging.getLogger(__name__)
 
@@ -17,23 +19,47 @@ class MotionDetector:
 
     def __init__(self, output_dir: Path, min_motion_area: int = 500, camera_index: int = 0):
         """
-        Initialize motion detector
+        Initialize motion detector with automatic camera detection
 
         Args:
             output_dir: Directory to save motion clips
             min_motion_area: Minimum contour area to trigger motion detection
-            camera_index: Camera device index (default: 0)
+            camera_index: Camera device index (default: 0, used as fallback for USB webcams)
         """
         self.output_dir = output_dir
         self.min_motion_area = min_motion_area
+        self.picam2 = None
+        self.camera = None
 
-        self.camera = cv2.VideoCapture(camera_index)
-        if not self.camera.isOpened():
-            raise RuntimeError(f"Could not open camera {camera_index}")
+        # Try to initialize Pi Camera first
+        try:
+            logger.info("Detecting camera... Attempting Raspberry Pi Camera Module...")
+            self.picam2 = Picamera2()
 
-        # Set camera resolution (720p for C270)
-        self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            # Configure camera for 1080p (1920x1080) - native resolution of 5MP module
+            config = self.picam2.create_video_configuration(
+                main={"size": (1920, 1080), "format": "RGB888"}
+            )
+            self.picam2.configure(config)
+            self.picam2.start()
+
+            # Give camera time to warm up
+            time.sleep(2)
+            logger.info("✓ Pi Camera Module detected and initialized at 1920x1080")
+
+        except Exception as e:
+            # Pi Camera failed, fall back to USB webcam
+            logger.info(f"Pi Camera not available ({e}), trying USB webcam...")
+            self.picam2 = None
+
+            self.camera = cv2.VideoCapture(camera_index)
+            if not self.camera.isOpened():
+                raise RuntimeError(f"Could not open any camera (Pi Camera failed, USB camera {camera_index} not found)")
+
+            # Set camera resolution (720p for USB webcams)
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            logger.info(f"✓ USB webcam detected and initialized at 1280x720 (device {camera_index})")
 
         # Initialize background subtractor
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
@@ -41,7 +67,7 @@ class MotionDetector:
         )
 
         # Read first frame to initialize
-        ret, self.prev_frame = self.camera.read()
+        ret, self.prev_frame = self.read()
         if not ret:
             raise RuntimeError("Could not read initial frame")
 
@@ -53,6 +79,25 @@ class MotionDetector:
         self.clip_frames = []
 
         logger.info("Motion detector initialized")
+
+    def read(self):
+        """
+        Read a frame from the camera (handles both Pi Camera and USB webcam)
+
+        Returns:
+            Tuple of (success: bool, frame: np.ndarray)
+        """
+        if self.picam2:
+            try:
+                frame = self.picam2.capture_array()
+                # Convert RGB to BGR for OpenCV compatibility
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                return True, frame
+            except Exception as e:
+                logger.error(f"Failed to capture from Pi Camera: {e}")
+                return False, None
+        else:
+            return self.camera.read()
 
     def detect_motion(self, frame):
         """
@@ -168,5 +213,11 @@ class MotionDetector:
         """Release camera resources"""
         if self.clip_writer is not None:
             self.clip_writer.release()
-        self.camera.release()
+
+        if self.picam2:
+            self.picam2.stop()
+            self.picam2.close()
+        elif self.camera:
+            self.camera.release()
+
         cv2.destroyAllWindows()
