@@ -5,8 +5,9 @@ Handles CloudWatch Logs and Metrics with assumed role credentials
 
 import boto3
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
+from botocore.exceptions import ClientError
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class CloudWatchClient:
         self.logs_client = None
         self.metrics_client = None
         self.log_handler = None
+        self.credentials_expiry = None
 
         # Initialize clients
         self._init_clients()
@@ -40,9 +42,11 @@ class CloudWatchClient:
                 sts_client = boto3.client('sts', region_name=self.region)
                 response = sts_client.assume_role(
                     RoleArn=self.role_arn,
-                    RoleSessionName='motion-detection-cloudwatch-session'
+                    RoleSessionName='motion-detection-cloudwatch-session',
+                    DurationSeconds=3600  # 1 hour
                 )
                 credentials = response['Credentials']
+                self.credentials_expiry = credentials['Expiration']
 
                 # Create CloudWatch clients with temporary credentials
                 self.logs_client = boto3.client(
@@ -71,6 +75,22 @@ class CloudWatchClient:
             logger.warning(f"Failed to initialize CloudWatch clients: {e}")
             self.logs_client = None
             self.metrics_client = None
+
+    def _should_refresh_credentials(self):
+        """Check if credentials need to be refreshed"""
+        if not self.credentials_expiry or not self.role_arn:
+            return False
+
+        # Refresh if within 5 minutes of expiry
+        now = datetime.now(self.credentials_expiry.tzinfo)
+        time_until_expiry = self.credentials_expiry - now
+        return time_until_expiry < timedelta(minutes=5)
+
+    def _refresh_credentials_if_needed(self):
+        """Refresh credentials if they're about to expire"""
+        if self._should_refresh_credentials():
+            logger.info("Refreshing CloudWatch credentials")
+            self._init_clients()
 
     def get_log_handler(self, log_group: str, stream_name: str):
         """
@@ -126,6 +146,9 @@ class CloudWatchClient:
         """
         if not self.metrics_client:
             return
+
+        # Check and refresh credentials if needed
+        self._refresh_credentials_if_needed()
 
         try:
             metric_data = {
