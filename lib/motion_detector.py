@@ -42,11 +42,17 @@ class MotionDetector:
             )
             self.picam2.configure(config)
 
-            # Set camera controls for better brightness
+            # Set camera controls for better brightness and color correction
             self.picam2.set_controls({
-                "Brightness": 0.1,      # -1.0 to 1.0 (increase for brighter)
-                "Contrast": 1.2,        # 0.0 to 2.0 (increase for more contrast)
-                "ExposureValue": 1.0    # -8.0 to 8.0 (increase for brighter exposure)
+                "Brightness": 0.1,          # -1.0 to 1.0 (increase for brighter)
+                "Contrast": 1.3,            # 0.0 to 2.0 (increase for more contrast)
+                "ExposureValue": 1.5,       # -8.0 to 8.0 (increase for brighter exposure)
+                "AeEnable": True,           # Enable auto-exposure
+                "AwbEnable": True,          # Enable auto white balance
+                "ColourGains": (1.3, 2.0),  # (Red, Blue) gains - reduce red, increase blue
+                "AnalogueGain": 2.0,        # Increase sensitivity for dark areas (1.0-8.0+)
+                "Sharpness": 1.5,           # 0.0 to 16.0 (increase for sharper image)
+                "Saturation": 0.9           # 0.0 to 2.0 (slightly reduce saturation to tone down red)
             })
 
             self.picam2.start()
