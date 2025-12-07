@@ -92,6 +92,8 @@ class MotionDetector:
                 frame = self.picam2.capture_array()
                 # Convert RGB to BGR for OpenCV compatibility
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                # Rotate 180 degrees (upside down)
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
                 return True, frame
             except Exception as e:
                 logger.error(f"Failed to capture from Pi Camera: {e}")
