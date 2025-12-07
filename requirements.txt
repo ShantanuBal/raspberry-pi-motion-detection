@@ -4,4 +4,5 @@ boto3>=1.28.0
 python-dotenv>=1.0.0
 watchtower>=3.0.0
 picamera2>=0.3.12
+flask>=3.0.0
 
