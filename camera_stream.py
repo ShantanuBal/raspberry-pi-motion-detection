@@ -15,15 +15,11 @@ picam2 = Picamera2()
 config = picam2.create_video_configuration(main={"size": (1280, 720), "format": "RGB888"})
 picam2.configure(config)
 
-# Set camera controls for better brightness and dynamic range
+# Set camera controls for better brightness
 picam2.set_controls({
-    "Brightness": 0.1,          # -1.0 to 1.0 (increase for brighter)
-    "Contrast": 1.3,            # 0.0 to 2.0 (increase for more contrast)
-    "ExposureValue": 1.5,       # -8.0 to 8.0 (increase for brighter exposure)
-    "AeEnable": True,           # Enable auto-exposure
-    "AwbEnable": True,          # Enable auto white balance
-    "AnalogueGain": 2.0,        # Increase sensitivity for dark areas (1.0-8.0+)
-    "Sharpness": 1.5            # 0.0 to 16.0 (increase for sharper image)
+    "Brightness": 0.1,      # -1.0 to 1.0 (increase for brighter)
+    "Contrast": 1.2,        # 0.0 to 2.0 (increase for more contrast)
+    "ExposureValue": 1.0    # -8.0 to 8.0 (increase for brighter exposure)
 })
 
 picam2.start()
