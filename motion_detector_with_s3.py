@@ -228,7 +228,10 @@ def main():
                         logger.info(f"Uploading to S3: s3://{S3_BUCKET_NAME}/motion_detections/{Path(clip_path).name}")
                         upload_start = time.time()
 
-                        if s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score):
+                        # Determine camera type string
+                        camera_type_str = 'picamera' if use_picamera else 'usb'
+
+                        if s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score, camera_type=camera_type_str):
                             upload_time = time.time() - upload_start
                             logger.info(f"✅ Upload successful in {upload_time:.1f}s")
 

@@ -11,6 +11,7 @@ interface Video {
   lastModified: string;
   size: number;
   starred?: boolean;
+  camera?: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -256,6 +257,11 @@ export default function HomePage() {
                         </svg>
                       )}
                     </button>
+                    {video.camera && (
+                      <div className="text-gray-400 text-sm px-2 py-1 bg-gray-700 rounded">
+                        {video.camera === 'picamera' ? '📷 Pi Cam' : '🎥 USB'}
+                      </div>
+                    )}
                     <div className="text-gray-500 text-sm">
                       {formatBytes(video.size)}
                     </div>
