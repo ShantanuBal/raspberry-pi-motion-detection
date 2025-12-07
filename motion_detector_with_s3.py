@@ -242,6 +242,13 @@ def main():
                             cloudwatch.send_metric('UploadDuration', value=upload_time, unit='Seconds')
                             cloudwatch.send_metric('VideoSize', value=final_size_mb, unit='Megabytes')
                             cloudwatch.send_metric('MotionScore', value=motion_score, unit='None')
+
+                            # Delete local file after successful upload
+                            try:
+                                Path(clip_path).unlink()
+                                logger.info(f"🗑️  Deleted local file: {Path(clip_path).name}")
+                            except Exception as e:
+                                logger.warning(f"Failed to delete local file {clip_path}: {e}")
                         else:
                             logger.error(f"❌ Upload failed: {clip_path}")
                             cloudwatch.send_metric('UploadFailed', value=1.0, unit='Count')
