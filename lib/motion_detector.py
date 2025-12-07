@@ -17,23 +17,25 @@ logger = logging.getLogger(__name__)
 class MotionDetector:
     """Motion detection using frame differencing"""
 
-    def __init__(self, output_dir: Path, min_motion_area: int = 500, camera_index: int = 0):
+    def __init__(self, output_dir: Path, min_motion_area: int = 500, camera_index: int = 0, use_picamera: bool = True):
         """
-        Initialize motion detector with automatic camera detection
+        Initialize motion detector
 
         Args:
             output_dir: Directory to save motion clips
             min_motion_area: Minimum contour area to trigger motion detection
-            camera_index: Camera device index (default: 0, used as fallback for USB webcams)
+            camera_index: Camera device index (default: 0, used for USB webcams)
+            use_picamera: Use Raspberry Pi Camera Module (True) or USB webcam (False)
         """
         self.output_dir = output_dir
         self.min_motion_area = min_motion_area
         self.picam2 = None
         self.camera = None
 
-        # Try to initialize Pi Camera first
-        try:
-            logger.info("Detecting camera... Attempting Raspberry Pi Camera Module...")
+        # Initialize camera based on user preference
+        if use_picamera:
+            # Initialize Pi Camera
+            logger.info("Initializing Raspberry Pi Camera Module...")
             self.picam2 = Picamera2()
 
             # Configure camera for 1080p (1920x1080) - native resolution of 5MP module
@@ -53,21 +55,19 @@ class MotionDetector:
 
             # Give camera time to warm up and adjust exposure
             time.sleep(2)
-            logger.info("✓ Pi Camera Module detected and initialized at 1920x1080")
+            logger.info("✓ Pi Camera Module initialized at 1920x1080")
 
-        except Exception as e:
-            # Pi Camera failed, fall back to USB webcam
-            logger.info(f"Pi Camera not available ({e}), trying USB webcam...")
-            self.picam2 = None
-
+        else:
+            # Initialize USB webcam
+            logger.info(f"Initializing USB webcam (device {camera_index})...")
             self.camera = cv2.VideoCapture(camera_index)
             if not self.camera.isOpened():
-                raise RuntimeError(f"Could not open any camera (Pi Camera failed, USB camera {camera_index} not found)")
+                raise RuntimeError(f"Could not open USB camera {camera_index}")
 
             # Set camera resolution (720p for USB webcams)
             self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
             self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-            logger.info(f"✓ USB webcam detected and initialized at 1280x720 (device {camera_index})")
+            logger.info(f"✓ USB webcam initialized at 1280x720 (device {camera_index})")
 
         # Initialize background subtractor
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(

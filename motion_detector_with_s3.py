@@ -6,6 +6,7 @@ Detects motion, saves clips/images, and uploads to AWS S3
 import time
 import subprocess
 import os
+import argparse
 from datetime import datetime
 from pathlib import Path
 import logging
@@ -114,7 +115,19 @@ def main():
     """Main motion detection loop"""
     global cloudwatch
 
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Motion Detection System with S3 Upload')
+    parser.add_argument('--camera', type=str, choices=['picamera', 'usb'], default='picamera',
+                        help='Camera type to use: picamera (Raspberry Pi Camera Module) or usb (USB webcam)')
+    parser.add_argument('--camera-index', type=int, default=0,
+                        help='Camera device index for USB webcams (default: 0)')
+    args = parser.parse_args()
+
+    # Determine camera type
+    use_picamera = args.camera == 'picamera'
+
     logger.info("=== Motion Detection System Starting ===")
+    logger.info(f"Camera: {'Raspberry Pi Camera Module' if use_picamera else f'USB Webcam (device {args.camera_index})'}")
     logger.info(f"Configuration: S3={UPLOAD_TO_S3}, Bucket={S3_BUCKET_NAME}, Region={AWS_REGION}")
     logger.info(f"Settings: Clip Duration={CLIP_DURATION}s, Min Motion Area={MIN_MOTION_AREA}px")
 
@@ -152,7 +165,9 @@ def main():
     # Initialize motion detector
     detector = MotionDetector(
         output_dir=OUTPUT_DIR,
-        min_motion_area=MIN_MOTION_AREA
+        min_motion_area=MIN_MOTION_AREA,
+        camera_index=args.camera_index,
+        use_picamera=use_picamera
     )
 
     try:
