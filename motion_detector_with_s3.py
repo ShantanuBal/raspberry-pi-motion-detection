@@ -217,11 +217,12 @@ def main():
                     transcoded_path = transcode_to_h264(clip_path)
                     if transcoded_path:
                         transcode_time = time.time() - transcode_start
-                        transcoded_size_mb = Path(transcoded_path).stat().st_size / (1024 * 1024)
-                        logger.info(f"Transcoding complete in {transcode_time:.1f}s ({transcoded_size_mb:.2f} MB)")
+                        final_size_mb = Path(transcoded_path).stat().st_size / (1024 * 1024)
+                        logger.info(f"Transcoding complete in {transcode_time:.1f}s ({final_size_mb:.2f} MB)")
                         clip_path = transcoded_path
                     else:
                         logger.warning(f"Transcoding failed, will upload original file")
+                        final_size_mb = clip_size_mb
 
                     # Upload to S3
                     if s3_uploader and S3_UPLOAD_ON_MOTION:
@@ -238,7 +239,7 @@ def main():
                             # Send CloudWatch metrics
                             cloudwatch.send_metric('VideoUploaded', value=1.0, unit='Count')
                             cloudwatch.send_metric('UploadDuration', value=upload_time, unit='Seconds')
-                            cloudwatch.send_metric('VideoSize', value=transcoded_size_mb, unit='Megabytes')
+                            cloudwatch.send_metric('VideoSize', value=final_size_mb, unit='Megabytes')
                             cloudwatch.send_metric('MotionScore', value=motion_score, unit='None')
                         else:
                             logger.error(f"❌ Upload failed: {clip_path}")
