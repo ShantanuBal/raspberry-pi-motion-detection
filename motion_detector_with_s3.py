@@ -89,12 +89,13 @@ def transcode_to_h264(input_path: str) -> str:
             logger.error("Transcoded file is empty or doesn't exist")
             return None
 
-        # Remove original file and rename transcoded file
+        # Remove original file and rename transcoded file to .mp4
         input_file.unlink()
-        output_file.rename(input_file)
+        final_file = input_file.with_suffix('.mp4')
+        output_file.rename(final_file)
 
-        logger.info(f"Transcoding complete: {input_file.name}")
-        return str(input_file)
+        logger.info(f"Transcoding complete: {final_file.name}")
+        return str(final_file)
 
     except subprocess.TimeoutExpired:
         logger.error("FFmpeg transcoding timed out")

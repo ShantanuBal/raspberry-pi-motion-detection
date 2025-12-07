@@ -118,10 +118,8 @@ class S3Uploader:
         
         # Generate S3 key if not provided
         if s3_key is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = Path(local_path).name
-            file_ext = Path(local_path).suffix
-            s3_key = f"motion_detections/{timestamp}{file_ext}"
+            s3_key = f"motion_detections/{filename}"
         
         # Prepare metadata
         extra_args = {}

@@ -156,20 +156,29 @@ class MotionDetector:
             Path to the clip file being recorded
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = self.output_dir / f"motion_clip_{timestamp}.mp4"
 
         # Get frame dimensions
         height, width = frame.shape[:2]
         fps = 20  # Frames per second
 
-        # Initialize video writer with mp4v codec (will be transcoded to H.264 later)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        # Use different codec and filename prefix depending on camera type
+        if self.picam2:
+            # Pi Camera: Use mp4v codec
+            camera_prefix = "picamera"
+            filename = self.output_dir / f"{camera_prefix}_motion_clip_{timestamp}.mp4"
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        else:
+            # USB Camera: Use XVID codec (more reliable than mp4v)
+            camera_prefix = "usb"
+            filename = self.output_dir / f"{camera_prefix}_motion_clip_{timestamp}.mp4"
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+
         self.clip_writer = cv2.VideoWriter(
             str(filename), fourcc, fps, (width, height)
         )
 
         if not self.clip_writer.isOpened():
-            logger.error("Failed to open video writer with mp4v codec!")
+            logger.error(f"Failed to open video writer with {fourcc} codec!")
             self.clip_writer = None
 
         self.clip_frames = []
@@ -203,8 +212,12 @@ class MotionDetector:
             duration = time.time() - self.motion_start_time if self.motion_start_time else 0
             logger.info(f"Stopped recording clip (duration: {duration:.1f}s)")
 
-            # Return the most recent clip file
-            clip_files = sorted(self.output_dir.glob("motion_clip_*.mp4"))
+            # Return the most recent clip file for this camera type
+            if self.picam2:
+                clip_files = sorted(self.output_dir.glob("picamera_motion_clip_*.mp4"))
+            else:
+                clip_files = sorted(self.output_dir.glob("usb_motion_clip_*.mp4"))
+
             if clip_files:
                 return str(clip_files[-1]), duration
         return None, 0
