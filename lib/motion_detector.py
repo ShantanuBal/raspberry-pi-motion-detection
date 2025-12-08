@@ -165,12 +165,12 @@ class MotionDetector:
         if self.picam2:
             # Pi Camera: Use mp4v codec
             camera_prefix = "picamera"
-            filename = self.output_dir / f"{camera_prefix}_motion_clip_{timestamp}.mp4"
+            filename = self.output_dir / f"{timestamp}_{camera_prefix}.mp4"
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         else:
             # USB Camera: Use XVID codec (more reliable than mp4v)
             camera_prefix = "usb"
-            filename = self.output_dir / f"{camera_prefix}_motion_clip_{timestamp}.mp4"
+            filename = self.output_dir / f"{timestamp}_{camera_prefix}.mp4"
             fourcc = cv2.VideoWriter_fourcc(*'XVID')
 
         self.clip_writer = cv2.VideoWriter(
@@ -214,9 +214,9 @@ class MotionDetector:
 
             # Return the most recent clip file for this camera type
             if self.picam2:
-                clip_files = sorted(self.output_dir.glob("picamera_motion_clip_*.mp4"))
+                clip_files = sorted(self.output_dir.glob("*_picamera.mp4"))
             else:
-                clip_files = sorted(self.output_dir.glob("usb_motion_clip_*.mp4"))
+                clip_files = sorted(self.output_dir.glob("*_usb.mp4"))
 
             if clip_files:
                 return str(clip_files[-1]), duration
