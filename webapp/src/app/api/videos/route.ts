@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const page = searchParams.get("page") || undefined;
+    const continuationToken = searchParams.get("continuationToken") || undefined;
 
-    const result = await listVideos(page);
+    const result = await listVideos(continuationToken);
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error listing videos:", error);

@@ -44,13 +44,14 @@ export default function HomePage() {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [continuationToken, setContinuationToken] = useState<string | undefined>();
+  const [previousTokens, setPreviousTokens] = useState<(string | undefined)[]>([]);
   const [hasMore, setHasMore] = useState(false);
-  const [totalVideos, setTotalVideos] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
   const [starredVideoKeys, setStarredVideoKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchVideos(0);
+    fetchVideos();
     fetchStarredVideos();
   }, []);
 
@@ -100,21 +101,49 @@ export default function HomePage() {
     }
   };
 
-  const fetchVideos = async (page: number) => {
+  const fetchVideos = async (token?: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/videos?page=${page}`);
+      const url = token
+        ? `/api/videos?continuationToken=${encodeURIComponent(token)}`
+        : '/api/videos';
+      const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch videos");
       const data = await response.json();
       setVideos(data.videos);
-      setCurrentPage(page);
       setHasMore(data.hasMore);
-      setTotalVideos(data.total || 0);
+      setContinuationToken(data.nextContinuationToken);
     } catch (err) {
       setError("Failed to load videos");
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshVideos = () => {
+    setPreviousTokens([]);
+    setCurrentPage(0);
+    setContinuationToken(undefined);
+    fetchVideos();
+  };
+
+  const goToNextPage = () => {
+    if (continuationToken && hasMore) {
+      setPreviousTokens([...previousTokens, continuationToken]);
+      setCurrentPage(currentPage + 1);
+      fetchVideos(continuationToken);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 0) {
+      const newPreviousTokens = [...previousTokens];
+      newPreviousTokens.pop();
+      const previousToken = newPreviousTokens[newPreviousTokens.length - 1];
+      setPreviousTokens(newPreviousTokens);
+      setCurrentPage(currentPage - 1);
+      fetchVideos(previousToken);
     }
   };
 
@@ -192,10 +221,10 @@ export default function HomePage() {
           <div className="grid gap-4">
             <div className="flex justify-between items-center mb-2">
               <div className="text-gray-400 text-sm">
-                Showing {currentPage * 10 + 1}-{Math.min((currentPage + 1) * 10, totalVideos)} of {totalVideos} video{totalVideos !== 1 ? "s" : ""}
+                Page {currentPage + 1} • Showing {videos.length} video{videos.length !== 1 ? "s" : ""}
               </div>
               <button
-                onClick={() => fetchVideos(currentPage)}
+                onClick={refreshVideos}
                 className="p-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
                 title="Refresh"
               >
@@ -272,7 +301,7 @@ export default function HomePage() {
             {/* Pagination */}
             <div className="flex justify-center items-center gap-4 mt-4">
               <button
-                onClick={() => fetchVideos(currentPage - 1)}
+                onClick={goToPreviousPage}
                 disabled={currentPage === 0}
                 className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Previous Page"
@@ -293,10 +322,10 @@ export default function HomePage() {
                 </svg>
               </button>
               <span className="text-gray-400 text-sm">
-                Page {currentPage + 1} of {Math.ceil(totalVideos / 10)}
+                Page {currentPage + 1}
               </span>
               <button
-                onClick={() => fetchVideos(currentPage + 1)}
+                onClick={goToNextPage}
                 disabled={!hasMore}
                 className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Next Page"
