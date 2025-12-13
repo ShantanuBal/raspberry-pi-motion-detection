@@ -4,6 +4,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import { Construct } from 'constructs';
 
 export class MotionDetectionStack extends cdk.Stack {
@@ -208,6 +209,272 @@ export class MotionDetectionStack extends cdk.Stack {
       value: starredVideosTable.tableName,
       description: 'Name of the DynamoDB table for starred videos',
     });
+
+    // CloudWatch Dashboard
+    const dashboard = new cloudwatch.Dashboard(this, 'MotionDetectionDashboard', {
+      dashboardName: 'MotionDetectionSystem',
+      defaultInterval: cdk.Duration.hours(3),
+    });
+
+    // Row 1: System Health & Activity
+    dashboard.addWidgets(
+      // Raspberry Pi Heartbeat
+      new cloudwatch.GraphWidget({
+        title: 'Raspberry Pi Heartbeat',
+        width: 8,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'SystemHeartbeat',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+      }),
+      // Motion Detection Events
+      new cloudwatch.GraphWidget({
+        title: 'Motion Detected Events',
+        width: 8,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'MotionDetected',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+      }),
+      // Video Uploads
+      new cloudwatch.GraphWidget({
+        title: 'Video Uploads',
+        width: 8,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'VideoUploaded',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.GREEN,
+          }),
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'UploadFailed',
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.RED,
+          }),
+        ],
+      }),
+    );
+
+    // Row 2: Video Metrics
+    dashboard.addWidgets(
+      // Motion Score
+      new cloudwatch.GraphWidget({
+        title: 'Motion Detection Score',
+        width: 8,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'MotionScore',
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+      }),
+      // Video Size
+      new cloudwatch.GraphWidget({
+        title: 'Video Size (MB)',
+        width: 8,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'VideoSize',
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+      }),
+      // Upload Duration
+      new cloudwatch.GraphWidget({
+        title: 'Upload Duration (seconds)',
+        width: 8,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'UploadDuration',
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+      }),
+    );
+
+    // Row 3: Lambda Metrics
+    dashboard.addWidgets(
+      // Lambda Invocations
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Invocations',
+        width: 8,
+        left: [
+          videoIndexerLambda.metricInvocations({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+      }),
+      // Lambda Errors
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Errors',
+        width: 8,
+        left: [
+          videoIndexerLambda.metricErrors({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.RED,
+          }),
+          videoIndexerLambda.metricThrottles({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.ORANGE,
+          }),
+        ],
+      }),
+      // Lambda Duration
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Duration (ms)',
+        width: 8,
+        left: [
+          videoIndexerLambda.metricDuration({
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+      }),
+    );
+
+    // Row 4: DynamoDB Metrics
+    dashboard.addWidgets(
+      // DynamoDB Read/Write Capacity
+      new cloudwatch.GraphWidget({
+        title: 'DynamoDB Videos Table - Read/Write Units',
+        width: 12,
+        left: [
+          videosTable.metricConsumedReadCapacityUnits({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+        right: [
+          videosTable.metricConsumedWriteCapacityUnits({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+        ],
+      }),
+      // DynamoDB Errors
+      new cloudwatch.GraphWidget({
+        title: 'DynamoDB Errors',
+        width: 12,
+        left: [
+          videosTable.metricUserErrors({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.RED,
+          }),
+          videosTable.metricSystemErrors({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.ORANGE,
+          }),
+        ],
+      }),
+    );
+
+    // Row 5: S3 Metrics
+    dashboard.addWidgets(
+      // S3 Bucket Size
+      new cloudwatch.GraphWidget({
+        title: 'S3 Bucket Size (Bytes)',
+        width: 12,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/S3',
+            metricName: 'BucketSizeBytes',
+            dimensionsMap: {
+              BucketName: bucket.bucketName,
+              StorageType: 'StandardStorage',
+            },
+            statistic: 'Average',
+            period: cdk.Duration.hours(24),
+          }),
+        ],
+      }),
+      // S3 Object Count
+      new cloudwatch.GraphWidget({
+        title: 'S3 Object Count',
+        width: 12,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'AWS/S3',
+            metricName: 'NumberOfObjects',
+            dimensionsMap: {
+              BucketName: bucket.bucketName,
+              StorageType: 'AllStorageTypes',
+            },
+            statistic: 'Average',
+            period: cdk.Duration.hours(24),
+          }),
+        ],
+      }),
+    );
+
+    // Row 6: Alarms Summary
+    const uptimeAlarm = new cloudwatch.Alarm(this, 'RaspberryPiDownAlarm', {
+      metric: new cloudwatch.Metric({
+        namespace: 'RaspberryPi/MotionDetection',
+        metricName: 'SystemHeartbeat',
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(10),
+      }),
+      threshold: 1,
+      evaluationPeriods: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+      alarmDescription: 'Raspberry Pi has not sent a heartbeat in 20 minutes',
+    });
+
+    const uploadFailureAlarm = new cloudwatch.Alarm(this, 'UploadFailureAlarm', {
+      metric: new cloudwatch.Metric({
+        namespace: 'RaspberryPi/MotionDetection',
+        metricName: 'UploadFailed',
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 3,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      alarmDescription: '3 or more upload failures in 5 minutes',
+    });
+
+    const lambdaErrorAlarm = new cloudwatch.Alarm(this, 'LambdaErrorAlarm', {
+      metric: videoIndexerLambda.metricErrors({
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      alarmDescription: 'Lambda function has 5 or more errors in 5 minutes',
+    });
+
+    dashboard.addWidgets(
+      new cloudwatch.AlarmStatusWidget({
+        title: 'System Health Alarms',
+        width: 24,
+        alarms: [uptimeAlarm, uploadFailureAlarm, lambdaErrorAlarm],
+      }),
+    );
 
     // Note: Access keys need to be created manually via AWS Console or CLI
     // After deployment, run:
