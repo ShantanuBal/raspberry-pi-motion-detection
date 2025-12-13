@@ -101,7 +101,7 @@ export default function HomePage() {
     }
   };
 
-  const fetchVideos = async (token?: string) => {
+  const fetchVideos = async (token?: string, navigatingBack: boolean = false) => {
     setLoading(true);
     try {
       const url = token
@@ -112,7 +112,11 @@ export default function HomePage() {
       const data = await response.json();
       setVideos(data.videos);
       setHasMore(data.hasMore);
-      setContinuationToken(data.nextContinuationToken);
+
+      // Only update continuation token if not navigating back
+      if (!navigatingBack) {
+        setContinuationToken(data.nextContinuationToken);
+      }
     } catch (err) {
       setError("Failed to load videos");
       console.error(err);
@@ -132,18 +136,19 @@ export default function HomePage() {
     if (continuationToken && hasMore) {
       setPreviousTokens([...previousTokens, continuationToken]);
       setCurrentPage(currentPage + 1);
-      fetchVideos(continuationToken);
+      fetchVideos(continuationToken, false);
     }
   };
 
   const goToPreviousPage = () => {
     if (currentPage > 0) {
       const newPreviousTokens = [...previousTokens];
-      newPreviousTokens.pop();
+      const currentToken = newPreviousTokens.pop();
       const previousToken = newPreviousTokens[newPreviousTokens.length - 1];
       setPreviousTokens(newPreviousTokens);
       setCurrentPage(currentPage - 1);
-      fetchVideos(previousToken);
+      setContinuationToken(currentToken); // Restore the token for this page
+      fetchVideos(previousToken, true);
     }
   };
 

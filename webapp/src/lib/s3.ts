@@ -29,60 +29,72 @@ export interface PaginatedVideos {
 const PAGE_SIZE = 10;
 
 export async function listVideos(continuationToken?: string): Promise<PaginatedVideos> {
-  // With timestamp-first filenames (YYYYMMDD_HHMMSS_camera_motion_clip.mp4),
-  // S3 lists files in reverse chronological order when sorted descending
-  // We can now fetch just one page at a time
+  // S3 doesn't support sorting, so we need to fetch all videos and sort client-side
+  // For pagination with sorting by date, we fetch all keys first, then paginate
+  const allVideos: VideoFile[] = [];
+  let nextToken: string | undefined = undefined;
 
-  const command = new ListObjectsV2Command({
-    Bucket: BUCKET_NAME,
-    Prefix: "motion_detections/",
-    MaxKeys: PAGE_SIZE,
-    ContinuationToken: continuationToken,
-  });
+  // Fetch ALL objects from S3 (loop through all pages)
+  do {
+    const command = new ListObjectsV2Command({
+      Bucket: BUCKET_NAME,
+      Prefix: "motion_detections/",
+      ContinuationToken: nextToken,
+    });
 
-  const response: ListObjectsV2CommandOutput = await s3Client.send(command);
+    const response: ListObjectsV2CommandOutput = await s3Client.send(command);
 
-  const videos: VideoFile[] = [];
+    if (response.Contents) {
+      const videoObjects = response.Contents.filter((obj: _Object) => obj.Key?.endsWith(".mp4"));
 
-  if (response.Contents) {
-    const videoObjects = response.Contents.filter((obj: _Object) => obj.Key?.endsWith(".mp4"));
+      // Fetch metadata for all videos in this batch in parallel
+      const videosWithMetadata = await Promise.all(
+        videoObjects.map(async (obj: _Object) => {
+          const video: VideoFile = {
+            key: obj.Key || "",
+            name: obj.Key?.split("/").pop() || "",
+            lastModified: obj.LastModified || new Date(),
+            size: obj.Size || 0,
+          };
 
-    // Fetch metadata for videos in this page in parallel
-    const videosWithMetadata = await Promise.all(
-      videoObjects.map(async (obj: _Object) => {
-        const video: VideoFile = {
-          key: obj.Key || "",
-          name: obj.Key?.split("/").pop() || "",
-          lastModified: obj.LastModified || new Date(),
-          size: obj.Size || 0,
-        };
+          // Fetch metadata for this video
+          try {
+            const headCommand = new HeadObjectCommand({
+              Bucket: BUCKET_NAME,
+              Key: video.key,
+            });
+            const headResponse = await s3Client.send(headCommand);
+            video.camera = headResponse.Metadata?.camera || undefined;
+          } catch (error) {
+            console.error(`Failed to fetch metadata for ${video.key}:`, error);
+          }
 
-        // Fetch metadata for this video
-        try {
-          const headCommand = new HeadObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: video.key,
-          });
-          const headResponse = await s3Client.send(headCommand);
-          video.camera = headResponse.Metadata?.camera || undefined;
-        } catch (error) {
-          console.error(`Failed to fetch metadata for ${video.key}:`, error);
-        }
+          return video;
+        })
+      );
 
-        return video;
-      })
-    );
+      allVideos.push(...videosWithMetadata);
+    }
 
-    videos.push(...videosWithMetadata);
-  }
+    nextToken = response.NextContinuationToken;
+  } while (nextToken);
 
-  // Sort by filename descending (newest first) since filenames start with timestamp
-  videos.sort((a, b) => b.name.localeCompare(a.name));
+  // Sort by lastModified descending (newest first)
+  allVideos.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+
+  // Parse continuation token as page number (0-indexed)
+  const page = continuationToken ? parseInt(continuationToken, 10) : 0;
+  const startIndex = page * PAGE_SIZE;
+  const endIndex = startIndex + PAGE_SIZE;
+
+  const paginatedVideos = allVideos.slice(startIndex, endIndex);
+  const hasMore = endIndex < allVideos.length;
 
   return {
-    videos,
-    nextContinuationToken: response.NextContinuationToken,
-    hasMore: !!response.IsTruncated,
+    videos: paginatedVideos,
+    nextContinuationToken: hasMore ? String(page + 1) : undefined,
+    hasMore,
+    total: allVideos.length,
   };
 }
 

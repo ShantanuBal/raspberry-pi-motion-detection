@@ -2,6 +2,8 @@ import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import { Construct } from 'constructs';
 
 export class MotionDetectionStack extends cdk.Stack {
@@ -28,9 +30,36 @@ export class MotionDetectionStack extends cdk.Stack {
           allowedHeaders: ['*'],
           allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
           allowedOrigins: ['http://localhost:3000', 'https://raspberry-pi-motion-detection.vercel.app'],
-          exposedHeaders: [],
+          exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges', 'ETag'],
         },
       ],
+    });
+
+    // DynamoDB Table for video metadata
+    const videosTable = new dynamodb.Table(this, 'VideosTable', {
+      tableName: 'motion-detection-videos',
+      partitionKey: {
+        name: 'videoKey',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      pointInTimeRecovery: true,
+      timeToLiveAttribute: 'ttl', // Auto-delete records after video expires
+    });
+
+    // Add GSI to query videos sorted by upload time (newest first)
+    videosTable.addGlobalSecondaryIndex({
+      indexName: 'UploadTimeIndex',
+      partitionKey: {
+        name: 'partition',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: 'uploadedAt',
+        type: dynamodb.AttributeType.NUMBER,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
     });
 
     // DynamoDB Table for starred videos
@@ -118,8 +147,31 @@ export class MotionDetectionStack extends cdk.Stack {
     // Grant read-only access to the bucket for the Vercel user
     bucket.grantRead(vercelUser);
 
-    // Grant DynamoDB permissions to Vercel user for starred videos
+    // Grant DynamoDB permissions to Vercel user for starred videos and video metadata
     starredVideosTable.grantReadWriteData(vercelUser);
+    videosTable.grantReadData(vercelUser);
+
+    // Lambda function to index videos when uploaded to S3
+    const videoIndexerLambda = new lambda.Function(this, 'VideoIndexerFunction', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 's3-video-indexer.handler',
+      code: lambda.Code.fromAsset('lambda'),
+      environment: {
+        VIDEOS_TABLE_NAME: videosTable.tableName,
+      },
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    // Grant Lambda permissions to read S3 and write to DynamoDB
+    bucket.grantRead(videoIndexerLambda);
+    videosTable.grantWriteData(videoIndexerLambda);
+
+    // Configure S3 to trigger Lambda on new video uploads
+    bucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.LambdaDestination(videoIndexerLambda),
+      { prefix: 'motion_detections/', suffix: '.mp4' }
+    );
 
     // Outputs
     new cdk.CfnOutput(this, 'BucketName', {
@@ -145,6 +197,11 @@ export class MotionDetectionStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'VercelUserName', {
       value: vercelUser.userName,
       description: 'IAM user name for Vercel webapp (read-only access)',
+    });
+
+    new cdk.CfnOutput(this, 'VideosTableName', {
+      value: videosTable.tableName,
+      description: 'Name of the DynamoDB table for video metadata',
     });
 
     new cdk.CfnOutput(this, 'StarredVideosTableName', {

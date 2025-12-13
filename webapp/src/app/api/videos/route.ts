@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { listVideos } from "@/lib/s3";
+import { listVideosFromDynamoDB } from "@/lib/videos";
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -14,8 +14,22 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const continuationToken = searchParams.get("continuationToken") || undefined;
 
-    const result = await listVideos(continuationToken);
-    return NextResponse.json(result);
+    const result = await listVideosFromDynamoDB(continuationToken);
+
+    // Transform the response to match the expected format
+    const videos = result.videos.map(video => ({
+      key: video.videoKey,
+      name: video.fileName,
+      lastModified: new Date(video.uploadedAt * 1000).toISOString(),
+      size: video.size,
+      camera: video.camera,
+    }));
+
+    return NextResponse.json({
+      videos,
+      nextContinuationToken: result.nextToken,
+      hasMore: result.hasMore,
+    });
   } catch (error) {
     console.error("Error listing videos:", error);
     return NextResponse.json(
