@@ -382,7 +382,8 @@ export class MotionDetectionStack extends cdk.Stack {
             period: cdk.Duration.minutes(5),
             color: cloudwatch.Color.RED,
           }),
-          videosTable.metricSystemErrors({
+          videosTable.metricSystemErrorsForOperations({
+            operations: [dynamodb.Operation.GET_ITEM, dynamodb.Operation.PUT_ITEM, dynamodb.Operation.QUERY],
             statistic: 'Sum',
             period: cdk.Duration.minutes(5),
             color: cloudwatch.Color.ORANGE,
