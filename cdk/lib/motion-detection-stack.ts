@@ -213,7 +213,7 @@ export class MotionDetectionStack extends cdk.Stack {
     // CloudWatch Dashboard
     const dashboard = new cloudwatch.Dashboard(this, 'MotionDetectionDashboard', {
       dashboardName: 'MotionDetectionSystem',
-      defaultInterval: cdk.Duration.hours(3),
+      defaultInterval: cdk.Duration.days(7),
     });
 
     // Row 1: System Health & Activity
