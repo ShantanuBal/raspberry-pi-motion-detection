@@ -29,7 +29,7 @@ export interface PaginatedVideos {
   hasMore: boolean;
 }
 
-export async function listVideosFromDynamoDB(continuationToken?: string): Promise<PaginatedVideos> {
+export async function listVideosFromDynamoDB(continuationToken?: string, camera?: string): Promise<PaginatedVideos> {
   try {
     // Parse continuation token (it's a base64 encoded lastEvaluatedKey)
     let exclusiveStartKey: any = undefined;
@@ -41,17 +41,29 @@ export async function listVideosFromDynamoDB(continuationToken?: string): Promis
       }
     }
 
+    // Build the query with optional camera filter
+    const expressionAttributeNames: Record<string, string> = {
+      '#partition': 'partition',
+    };
+    const expressionAttributeValues: Record<string, any> = {
+      ':partitionValue': 'all',
+    };
+
+    let filterExpression: string | undefined = undefined;
+    if (camera) {
+      expressionAttributeNames['#camera'] = 'camera';
+      expressionAttributeValues[':camera'] = camera;
+      filterExpression = '#camera = :camera';
+    }
+
     // Query the GSI sorted by uploadedAt (newest first)
     const command = new QueryCommand({
       TableName: VIDEOS_TABLE,
       IndexName: 'UploadTimeIndex',
       KeyConditionExpression: '#partition = :partitionValue',
-      ExpressionAttributeNames: {
-        '#partition': 'partition',
-      },
-      ExpressionAttributeValues: {
-        ':partitionValue': 'all',
-      },
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+      FilterExpression: filterExpression,
       ScanIndexForward: false, // Sort descending (newest first)
       Limit: PAGE_SIZE,
       ExclusiveStartKey: exclusiveStartKey,

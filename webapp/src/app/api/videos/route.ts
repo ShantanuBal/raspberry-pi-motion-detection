@@ -13,8 +13,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const continuationToken = searchParams.get("continuationToken") || undefined;
+    const camera = searchParams.get("camera") || undefined;
 
-    const result = await listVideosFromDynamoDB(continuationToken);
+    const result = await listVideosFromDynamoDB(continuationToken, camera);
 
     // Transform the response to match the expected format
     const videos = result.videos.map(video => ({

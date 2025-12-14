@@ -49,11 +49,12 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [starredVideoKeys, setStarredVideoKeys] = useState<Set<string>>(new Set());
+  const [cameraFilter, setCameraFilter] = useState<string>("all");
 
   useEffect(() => {
     fetchVideos();
     fetchStarredVideos();
-  }, []);
+  }, [cameraFilter]);
 
   const fetchStarredVideos = async () => {
     try {
@@ -104,9 +105,14 @@ export default function HomePage() {
   const fetchVideos = async (token?: string, navigatingBack: boolean = false) => {
     setLoading(true);
     try {
-      const url = token
-        ? `/api/videos?continuationToken=${encodeURIComponent(token)}`
-        : '/api/videos';
+      const params = new URLSearchParams();
+      if (token) {
+        params.append('continuationToken', token);
+      }
+      if (cameraFilter !== 'all') {
+        params.append('camera', cameraFilter);
+      }
+      const url = params.toString() ? `/api/videos?${params.toString()}` : '/api/videos';
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to fetch videos");
       const data = await response.json();
@@ -225,8 +231,30 @@ export default function HomePage() {
         ) : (
           <div className="grid gap-4">
             <div className="flex justify-between items-center mb-2">
-              <div className="text-gray-400 text-sm">
-                Page {currentPage + 1} • Showing {videos.length} video{videos.length !== 1 ? "s" : ""}
+              <div className="flex items-center gap-4">
+                <div className="text-gray-400 text-sm">
+                  Page {currentPage + 1} • Showing {videos.length} video{videos.length !== 1 ? "s" : ""}
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="camera-filter" className="text-gray-400 text-sm">
+                    Camera:
+                  </label>
+                  <select
+                    id="camera-filter"
+                    value={cameraFilter}
+                    onChange={(e) => {
+                      setCameraFilter(e.target.value);
+                      setPreviousTokens([]);
+                      setCurrentPage(0);
+                      setContinuationToken(undefined);
+                    }}
+                    className="bg-gray-700 text-white text-sm rounded px-3 py-1 border border-gray-600 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="all">All</option>
+                    <option value="picamera">📷 Pi Cam</option>
+                    <option value="usb">🎥 USB</option>
+                  </select>
+                </div>
               </div>
               <button
                 onClick={refreshVideos}
