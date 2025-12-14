@@ -136,25 +136,3 @@ class ObjectDetector:
             logger.info("No objects detected in frames")
 
         return detections_aggregate
-
-    def get_detected_classes(self, detections: Dict[str, float],
-                            min_confidence: float = None) -> List[str]:
-        """
-        Get list of detected object class names
-
-        Args:
-            detections: Dictionary from detect_objects_in_frames()
-            min_confidence: Optional minimum confidence filter (overrides default)
-
-        Returns:
-            Sorted list of unique object class names
-        """
-        threshold = min_confidence if min_confidence is not None else self.confidence_threshold
-
-        # Filter by confidence and return sorted list
-        detected_classes = [
-            class_name for class_name, conf in detections.items()
-            if conf >= threshold
-        ]
-
-        return sorted(detected_classes)
