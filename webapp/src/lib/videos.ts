@@ -1,6 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { getPresignedUrl } from "./s3";
 
 const dynamoClient = new DynamoDBClient({
   region: process.env.AWS_REGION || "us-west-2",
@@ -13,7 +12,7 @@ const dynamoClient = new DynamoDBClient({
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
 const VIDEOS_TABLE = process.env.VIDEOS_TABLE_NAME || "motion-detection-videos";
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 50;
 
 export interface VideoMetadata {
   videoKey: string;
@@ -84,5 +83,3 @@ export async function listVideosFromDynamoDB(continuationToken?: string): Promis
     throw error;
   }
 }
-
-export { getPresignedUrl };
