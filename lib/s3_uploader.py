@@ -9,7 +9,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from botocore.exceptions import ClientError
 
 # Configure logging
