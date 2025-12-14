@@ -31,6 +31,7 @@ class MotionDetector:
         self.min_motion_area = min_motion_area
         self.picam2 = None
         self.camera = None
+        self.object_detector = None
 
         # Initialize camera based on user preference
         if use_picamera:
@@ -85,6 +86,17 @@ class MotionDetector:
         self.motion_start_time = None
         self.clip_writer = None
         self.clip_frames = []
+
+        # Initialize object detector
+        try:
+            from lib.object_detector import ObjectDetector
+            logger.info("Initializing object detector...")
+            self.object_detector = ObjectDetector(confidence_threshold=0.25)
+            logger.info("✓ Object detector initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize object detector: {e}")
+            logger.warning("Continuing without object detection")
+            self.object_detector = None
 
         logger.info("Motion detector initialized")
 
@@ -200,17 +212,27 @@ class MotionDetector:
 
     def stop_clip_recording(self):
         """
-        Stop recording and return clip filename
+        Stop recording and return clip filename with detected objects
 
         Returns:
-            Tuple of (clip_path: str, duration: float)
+            Tuple of (clip_path: str, duration: float, detected_objects: dict)
         """
+        detected_objects = {}
+
         if self.clip_writer is not None:
             self.clip_writer.release()
             self.clip_writer = None
 
             duration = time.time() - self.motion_start_time if self.motion_start_time else 0
             logger.info(f"Stopped recording clip (duration: {duration:.1f}s)")
+
+            # Run object detection on recorded frames
+            if self.object_detector and self.clip_frames:
+                logger.info("Running object detection on recorded frames...")
+                detected_objects = self.object_detector.detect_objects_in_frames(
+                    self.clip_frames,
+                    sample_rate=10  # Analyze every 10th frame
+                )
 
             # Return the most recent clip file for this camera type
             if self.picam2:
@@ -219,8 +241,9 @@ class MotionDetector:
                 clip_files = sorted(self.output_dir.glob("*_usb_motion_clip.mp4"))
 
             if clip_files:
-                return str(clip_files[-1]), duration
-        return None, 0
+                return str(clip_files[-1]), duration, detected_objects
+
+        return None, 0, detected_objects
 
     def reset_background(self, frame):
         """

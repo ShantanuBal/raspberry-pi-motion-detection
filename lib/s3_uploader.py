@@ -181,7 +181,8 @@ class S3Uploader:
         return self.upload_file(image_path, metadata=metadata)
     
     def upload_motion_clip(self, video_path: str, duration: Optional[float] = None,
-                          motion_score: Optional[float] = None, camera_type: Optional[str] = None) -> bool:
+                          motion_score: Optional[float] = None, camera_type: Optional[str] = None,
+                          detected_objects: Optional[List[str]] = None) -> bool:
         """
         Upload a motion-detected video clip with metadata
 
@@ -190,6 +191,7 @@ class S3Uploader:
             duration: Optional clip duration in seconds
             motion_score: Optional motion detection score/confidence
             camera_type: Optional camera type (e.g., 'picamera', 'usb')
+            detected_objects: Optional list of detected object class names (e.g., ['person', 'cat'])
 
         Returns:
             True if successful, False otherwise
@@ -205,6 +207,9 @@ class S3Uploader:
             metadata['motion_score'] = str(motion_score)
         if camera_type is not None:
             metadata['camera'] = camera_type
+        if detected_objects is not None:
+            # Store as comma-separated string (S3 metadata must be strings)
+            metadata['detected_objects'] = ','.join(detected_objects)
 
         return self.upload_file(video_path, metadata=metadata)
     

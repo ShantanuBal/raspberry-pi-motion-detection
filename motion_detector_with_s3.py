@@ -205,7 +205,7 @@ def main():
                     time.sleep(0.05)
 
                 # Stop recording
-                clip_path, duration = detector.stop_clip_recording()
+                clip_path, duration, detected_objects = detector.stop_clip_recording()
                 logger.info(f"Recording complete: {frames_recorded} frames, {duration:.1f}s")
 
                 if clip_path:
@@ -233,7 +233,12 @@ def main():
                         # Determine camera type string
                         camera_type_str = 'picamera' if use_picamera else 'usb'
 
-                        if s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score, camera_type=camera_type_str):
+                        # Get list of detected object classes
+                        detected_classes = []
+                        if detected_objects:
+                            detected_classes = sorted(detected_objects.keys())
+
+                        if s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score, camera_type=camera_type_str, detected_objects=detected_classes):
                             upload_time = time.time() - upload_start
                             logger.info(f"✅ Upload successful in {upload_time:.1f}s")
 

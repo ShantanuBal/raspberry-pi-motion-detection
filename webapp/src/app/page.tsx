@@ -12,6 +12,7 @@ interface Video {
   size: number;
   starred?: boolean;
   camera?: string;
+  detectedObjects?: string[];
 }
 
 function formatBytes(bytes: number): string {
@@ -283,51 +284,65 @@ export default function HomePage() {
                 onClick={() => playVideo(video)}
                 className="bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-lg p-4 cursor-pointer transition-colors hover:border-gray-600"
               >
-                <div className="flex justify-between items-center">
-                  <h3 className="text-white font-medium">
-                    {formatDate(video.lastModified)}
-                  </h3>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={(e) => toggleStar(video, e)}
-                      className="text-gray-400 hover:text-yellow-400 transition-colors"
-                      title={starredVideoKeys.has(video.key) ? "Unstar" : "Star"}
-                    >
-                      {starredVideoKeys.has(video.key) ? (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                      ) : (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-                          />
-                        </svg>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-white font-medium">
+                      {formatDate(video.lastModified)}
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => toggleStar(video, e)}
+                        className="text-gray-400 hover:text-yellow-400 transition-colors"
+                        title={starredVideoKeys.has(video.key) ? "Unstar" : "Star"}
+                      >
+                        {starredVideoKeys.has(video.key) ? (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                          </svg>
+                        ) : (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                      {video.camera && (
+                        <div className="text-gray-400 text-sm px-2 py-1 bg-gray-700 rounded">
+                          {video.camera === 'picamera' ? '📷 Pi Cam' : '🎥 USB'}
+                        </div>
                       )}
-                    </button>
-                    {video.camera && (
-                      <div className="text-gray-400 text-sm px-2 py-1 bg-gray-700 rounded">
-                        {video.camera === 'picamera' ? '📷 Pi Cam' : '🎥 USB'}
+                      <div className="text-gray-500 text-sm">
+                        {formatBytes(video.size)}
                       </div>
-                    )}
-                    <div className="text-gray-500 text-sm">
-                      {formatBytes(video.size)}
                     </div>
                   </div>
+                  {video.detectedObjects && video.detectedObjects.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {video.detectedObjects.map((obj) => (
+                        <span
+                          key={obj}
+                          className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-900/50 text-blue-300 rounded border border-blue-700"
+                        >
+                          🔍 {obj}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
