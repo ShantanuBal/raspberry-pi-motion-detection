@@ -75,17 +75,10 @@ class MotionDetector:
             history=500, varThreshold=50, detectShadows=True
         )
 
-        # Read first frame to initialize (with retry for USB cameras that need warm-up)
-        max_retries = 5
-        for attempt in range(max_retries):
-            ret, self.prev_frame = self.read()
-            if ret:
-                break
-            logger.warning(f"Failed to read initial frame (attempt {attempt + 1}/{max_retries})")
-            time.sleep(0.5)
-
+        # Read first frame to initialize
+        ret, self.prev_frame = self.read()
         if not ret:
-            raise RuntimeError("Could not read initial frame after multiple attempts")
+            raise RuntimeError("Could not read initial frame")
 
         self.prev_gray = cv2.cvtColor(self.prev_frame, cv2.COLOR_BGR2GRAY)
         self.prev_gray_blur = cv2.GaussianBlur(self.prev_gray, (21, 21), 0)
