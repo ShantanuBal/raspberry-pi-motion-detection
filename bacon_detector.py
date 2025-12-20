@@ -5,7 +5,6 @@ Detects motion, saves clips/images, and uploads to AWS S3
 
 import time
 import subprocess
-import os
 import argparse
 from datetime import datetime
 from pathlib import Path
