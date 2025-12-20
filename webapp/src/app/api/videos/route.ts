@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       lastModified: new Date(video.uploadedAt * 1000).toISOString(),
       size: video.size,
       camera: video.camera,
+      detectedObjects: video.detectedObjects,
     }));
 
     return NextResponse.json({
