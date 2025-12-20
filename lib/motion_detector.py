@@ -228,7 +228,7 @@ class MotionDetector:
 
             # Run object detection on recorded frames
             if self.object_detector and self.clip_frames:
-                logger.info("Running object detection on recorded frames...")
+                logger.info("🔍 Running object detection on recorded frames...")
                 detected_objects = self.object_detector.detect_objects_in_frames(
                     self.clip_frames,
                     sample_rate=10  # Analyze every 10th frame

@@ -133,6 +133,6 @@ class ObjectDetector:
             ])
             logger.info(f"🔍 Detected objects: {detected_summary}")
         else:
-            logger.info("No objects detected in frames")
+            logger.info("🔍 No objects detected in frames")
 
         return detections_aggregate
