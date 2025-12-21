@@ -51,6 +51,8 @@ export default function HomePage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [starredVideoKeys, setStarredVideoKeys] = useState<Set<string>>(new Set());
   const [cameraFilter, setCameraFilter] = useState<string>("all");
+  const [showCatsOnly, setShowCatsOnly] = useState<boolean>(false);
+  const [showPeopleOnly, setShowPeopleOnly] = useState<boolean>(false);
 
   useEffect(() => {
     fetchVideos();
@@ -207,6 +209,19 @@ export default function HomePage() {
     }
   };
 
+  // Filter videos based on object detection filters
+  const filteredVideos = videos.filter(video => {
+    // If cat filter is on, check for cats
+    if (showCatsOnly && !video.detectedObjects?.some(obj => obj.toLowerCase() === 'cat')) {
+      return false;
+    }
+    // If person filter is on, check for people
+    if (showPeopleOnly && !video.detectedObjects?.some(obj => obj.toLowerCase() === 'person')) {
+      return false;
+    }
+    return true;
+  });
+
   if (!session) {
     return null;
   }
@@ -234,7 +249,8 @@ export default function HomePage() {
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-4">
                 <div className="text-gray-400 text-sm">
-                  Page {currentPage + 1} • Showing {videos.length} video{videos.length !== 1 ? "s" : ""}
+                  Page {currentPage + 1} • Showing {filteredVideos.length} video{filteredVideos.length !== 1 ? "s" : ""}
+                  {(showCatsOnly || showPeopleOnly) && ` (${videos.length} total)`}
                 </div>
                 <div className="flex items-center gap-2">
                   <label htmlFor="camera-filter" className="text-gray-400 text-sm">
@@ -256,6 +272,28 @@ export default function HomePage() {
                     <option value="usb">🎥 USB</option>
                   </select>
                 </div>
+                <button
+                  onClick={() => setShowCatsOnly(!showCatsOnly)}
+                  className={`flex items-center gap-2 px-3 py-1 text-sm rounded transition-colors ${
+                    showCatsOnly
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                  title={showCatsOnly ? "Show all videos" : "Show only cat videos"}
+                >
+                  🐱 Cats
+                </button>
+                <button
+                  onClick={() => setShowPeopleOnly(!showPeopleOnly)}
+                  className={`flex items-center gap-2 px-3 py-1 text-sm rounded transition-colors ${
+                    showPeopleOnly
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                  title={showPeopleOnly ? "Show all videos" : "Show only videos with people"}
+                >
+                  🧑 People
+                </button>
               </div>
               <button
                 onClick={refreshVideos}
@@ -278,7 +316,7 @@ export default function HomePage() {
                 </svg>
               </button>
             </div>
-            {videos.map((video) => (
+            {filteredVideos.map((video) => (
               <div
                 key={video.key}
                 onClick={() => playVideo(video)}
