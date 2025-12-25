@@ -4,7 +4,7 @@ Detects objects in video frames for motion detection tagging
 """
 
 import logging
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Tuple
 import numpy as np
 from pathlib import Path
 
@@ -136,3 +136,59 @@ class ObjectDetector:
             logger.info("🔍 No objects detected in frames")
 
         return detections_aggregate
+
+    def detect_objects_with_bboxes(self, frames: List[np.ndarray],
+                                   sample_rate: int = 10) -> List[Dict]:
+        """
+        Detect objects across multiple frames and return full detection data with bboxes
+
+        Args:
+            frames: List of video frames
+            sample_rate: Only process every Nth frame (default: 10)
+
+        Returns:
+            List of detections with the highest confidence for each unique object, containing:
+            - class_name: Object class name
+            - confidence: Detection confidence
+            - bbox: Bounding box [x1, y1, x2, y2]
+            - frame_index: Frame index where this detection occurred
+        """
+        if not frames:
+            return []
+
+        # Track best detection for each class
+        best_detections: Dict[str, Dict] = {}
+
+        # Sample frames to reduce processing time
+        sampled_indices = list(range(0, len(frames), sample_rate))
+        logger.info(f"Running object detection on {len(sampled_indices)} sampled frames (every {sample_rate}th frame)...")
+
+        for frame_idx in sampled_indices:
+            frame = frames[frame_idx]
+            detections = self.detect_objects_in_frame(frame)
+
+            # Keep the best detection for each class
+            for detection in detections:
+                class_name = detection['class_name']
+                confidence = detection['confidence']
+
+                # If this is a new class or higher confidence, update
+                if (class_name not in best_detections or
+                    confidence > best_detections[class_name]['confidence']):
+                    best_detections[class_name] = {
+                        'class_name': class_name,
+                        'confidence': confidence,
+                        'bbox': detection['bbox'],
+                        'frame_index': frame_idx
+                    }
+
+        # Convert to list and log
+        result = list(best_detections.values())
+        if result:
+            detected_summary = ', '.join([
+                f"{d['class_name']} ({d['confidence']:.2f})"
+                for d in sorted(result, key=lambda x: -x['confidence'])
+            ])
+            logger.info(f"🔍 Detected objects with bboxes: {detected_summary}")
+
+        return result

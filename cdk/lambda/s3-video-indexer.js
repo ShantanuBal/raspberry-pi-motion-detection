@@ -67,6 +67,22 @@ exports.handler = async (event) => {
         console.log(`✗ No detected_objects found in metadata`);
       }
 
+      // Extract bounding box data from metadata
+      let detectionsBboxes = null;
+      console.log(`Checking for detections_bboxes in metadata...`);
+      console.log(`headResponse.Metadata?.detections_bboxes = ${headResponse.Metadata?.detections_bboxes ? 'present' : 'missing'}`);
+
+      if (headResponse.Metadata?.detections_bboxes) {
+        try {
+          detectionsBboxes = JSON.parse(headResponse.Metadata.detections_bboxes);
+          console.log(`✓ Bounding boxes parsed: ${detectionsBboxes.length} detections`);
+        } catch (err) {
+          console.error(`✗ Failed to parse detections_bboxes JSON: ${err.message}`);
+        }
+      } else {
+        console.log(`✗ No detections_bboxes found in metadata`);
+      }
+
       // Store video metadata in DynamoDB
       const item = {
         videoKey: key,
@@ -82,6 +98,11 @@ exports.handler = async (event) => {
       // Add detected objects if any were found
       if (detectedObjects.length > 0) {
         item.detectedObjects = detectedObjects;
+      }
+
+      // Add bounding box data if available
+      if (detectionsBboxes && detectionsBboxes.length > 0) {
+        item.detectionsBboxes = detectionsBboxes;
       }
 
       await docClient.send(new PutCommand({

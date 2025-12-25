@@ -215,9 +215,10 @@ class MotionDetector:
         Stop recording and return clip filename with detected objects
 
         Returns:
-            Tuple of (clip_path: str, duration: float, detected_objects: dict)
+            Tuple of (clip_path: str, duration: float, detected_objects: dict, detections_with_bboxes: list)
         """
         detected_objects = {}
+        detections_with_bboxes = []
 
         if self.clip_writer is not None:
             self.clip_writer.release()
@@ -229,9 +230,15 @@ class MotionDetector:
             # Run object detection on recorded frames
             if self.object_detector and self.clip_frames:
                 logger.info("🔍 Running object detection on recorded frames...")
+                # Get class names with max confidence
                 detected_objects = self.object_detector.detect_objects_in_frames(
                     self.clip_frames,
                     sample_rate=10  # Analyze every 10th frame
+                )
+                # Get full detection data with bounding boxes
+                detections_with_bboxes = self.object_detector.detect_objects_with_bboxes(
+                    self.clip_frames,
+                    sample_rate=10
                 )
 
             # Return the most recent clip file for this camera type
@@ -241,9 +248,9 @@ class MotionDetector:
                 clip_files = sorted(self.output_dir.glob("*_usb_motion_clip.mp4"))
 
             if clip_files:
-                return str(clip_files[-1]), duration, detected_objects
+                return str(clip_files[-1]), duration, detected_objects, detections_with_bboxes
 
-        return None, 0, detected_objects
+        return None, 0, detected_objects, detections_with_bboxes
 
     def reset_background(self, frame):
         """

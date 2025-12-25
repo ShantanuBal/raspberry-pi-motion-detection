@@ -4,6 +4,14 @@ import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import VideoPlayer from "@/components/VideoPlayer";
+
+interface Detection {
+  class_name: string;
+  confidence: number;
+  bbox: [number, number, number, number]; // [x1, y1, x2, y2]
+  frame_index: number;
+}
 
 interface Video {
   key: string;
@@ -13,6 +21,7 @@ interface Video {
   starred?: boolean;
   camera?: string;
   detectedObjects?: string[];
+  detectionsBboxes?: Detection[];
 }
 
 function formatBytes(bytes: number): string {
@@ -522,23 +531,19 @@ export default function HomePage() {
                 {loadingVideo ? (
                   <div className="text-gray-400">Loading video...</div>
                 ) : videoUrl ? (
-                  <video
-                    src={videoUrl}
-                    controls
-                    autoPlay
-                    className="w-full h-full rounded"
-                  onLoadStart={() => console.log("[video] Load started, S3 URL:", videoUrl)}
-                  onLoadedData={() => console.log("[video] Data loaded")}
-                  onCanPlay={() => console.log("[video] Can play")}
-                  onError={(e) => {
-                    const video = e.currentTarget;
-                    console.error("[video] Error:", video.error?.message, video.error?.code);
-                    console.error("[video] Network state:", video.networkState);
-                    console.error("[video] Ready state:", video.readyState);
-                  }}
-                >
-                  Your browser does not support the video tag.
-                </video>
+                  <VideoPlayer
+                    videoUrl={videoUrl}
+                    detections={selectedVideo.detectionsBboxes}
+                    onLoadStart={() => console.log("[video] Load started, S3 URL:", videoUrl)}
+                    onLoadedData={() => console.log("[video] Data loaded")}
+                    onCanPlay={() => console.log("[video] Can play")}
+                    onError={(e) => {
+                      const video = e.currentTarget;
+                      console.error("[video] Error:", video.error?.message, video.error?.code);
+                      console.error("[video] Network state:", video.networkState);
+                      console.error("[video] Ready state:", video.readyState);
+                    }}
+                  />
               ) : (
                   <div className="text-red-400">Failed to load video</div>
                 )}

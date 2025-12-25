@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       size: video.size,
       camera: video.camera,
       detectedObjects: video.detectedObjects,
+      detectionsBboxes: video.detectionsBboxes,
     }));
 
     return NextResponse.json({

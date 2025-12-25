@@ -14,6 +14,13 @@ const docClient = DynamoDBDocumentClient.from(dynamoClient);
 const VIDEOS_TABLE = process.env.VIDEOS_TABLE_NAME || "motion-detection-videos";
 const PAGE_SIZE = 50;
 
+export interface Detection {
+  class_name: string;
+  confidence: number;
+  bbox: [number, number, number, number]; // [x1, y1, x2, y2]
+  frame_index: number;
+}
+
 export interface VideoMetadata {
   videoKey: string;
   fileName: string;
@@ -22,6 +29,7 @@ export interface VideoMetadata {
   camera: string;
   bucket: string;
   detectedObjects?: string[];
+  detectionsBboxes?: Detection[];
 }
 
 export interface PaginatedVideos {
@@ -80,6 +88,7 @@ export async function listVideosFromDynamoDB(continuationToken?: string, camera?
       camera: item.camera as string,
       bucket: item.bucket as string,
       detectedObjects: item.detectedObjects as string[] | undefined,
+      detectionsBboxes: item.detectionsBboxes as Detection[] | undefined,
     }));
 
     // Encode the LastEvaluatedKey as continuation token

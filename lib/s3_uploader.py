@@ -7,6 +7,7 @@ import boto3
 import os
 import logging
 import time
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List
@@ -182,7 +183,8 @@ class S3Uploader:
     
     def upload_motion_clip(self, video_path: str, duration: Optional[float] = None,
                           motion_score: Optional[float] = None, camera_type: Optional[str] = None,
-                          detected_objects: Optional[List[str]] = None) -> bool:
+                          detected_objects: Optional[List[str]] = None,
+                          detections_with_bboxes: Optional[List[dict]] = None) -> bool:
         """
         Upload a motion-detected video clip with metadata
 
@@ -192,6 +194,8 @@ class S3Uploader:
             motion_score: Optional motion detection score/confidence
             camera_type: Optional camera type (e.g., 'picamera', 'usb')
             detected_objects: Optional list of detected object class names (e.g., ['person', 'cat'])
+            detections_with_bboxes: Optional list of detections with bounding boxes
+                Each detection contains: class_name, confidence, bbox [x1,y1,x2,y2], frame_index
 
         Returns:
             True if successful, False otherwise
@@ -210,6 +214,10 @@ class S3Uploader:
         if detected_objects is not None:
             # Store as comma-separated string (S3 metadata must be strings)
             metadata['detected_objects'] = ','.join(detected_objects)
+        if detections_with_bboxes is not None and len(detections_with_bboxes) > 0:
+            # Store bounding box data as JSON string (S3 metadata must be strings)
+            # Note: S3 metadata has a 2KB limit per key, so we keep it compact
+            metadata['detections_bboxes'] = json.dumps(detections_with_bboxes)
 
         return self.upload_file(video_path, metadata=metadata)
     
