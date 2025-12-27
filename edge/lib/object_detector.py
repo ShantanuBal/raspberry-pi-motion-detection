@@ -116,6 +116,10 @@ class ObjectDetector:
                 class_name = detection['class_name']
                 confidence = detection['confidence']
 
+                # Skip detections below 50% confidence
+                if confidence < 0.5:
+                    continue
+
                 # Keep the highest confidence score for each class
                 if class_name not in detections_aggregate:
                     detections_aggregate[class_name] = confidence
@@ -147,7 +151,7 @@ class ObjectDetector:
             sample_rate: Only process every Nth frame (default: 10)
 
         Returns:
-            List of detections with the highest confidence for each unique object, containing:
+            List of all detections across sampled frames, each containing:
             - class_name: Object class name
             - confidence: Detection confidence
             - bbox: Bounding box [x1, y1, x2, y2]
@@ -156,8 +160,8 @@ class ObjectDetector:
         if not frames:
             return []
 
-        # Track best detection for each class
-        best_detections: Dict[str, Dict] = {}
+        # Collect all detections across frames
+        all_detections: List[Dict] = []
 
         # Sample frames to reduce processing time
         sampled_indices = list(range(0, len(frames), sample_rate))
@@ -167,28 +171,28 @@ class ObjectDetector:
             frame = frames[frame_idx]
             detections = self.detect_objects_in_frame(frame)
 
-            # Keep the best detection for each class
+            # Add all detections from this frame
             for detection in detections:
-                class_name = detection['class_name']
                 confidence = detection['confidence']
 
-                # If this is a new class or higher confidence, update
-                if (class_name not in best_detections or
-                    confidence > best_detections[class_name]['confidence']):
-                    best_detections[class_name] = {
-                        'class_name': class_name,
-                        'confidence': confidence,
-                        'bbox': detection['bbox'],
-                        'frame_index': frame_idx
-                    }
+                # Skip detections below 50% confidence
+                if confidence < 0.5:
+                    continue
 
-        # Convert to list and log
-        result = list(best_detections.values())
-        if result:
-            detected_summary = ', '.join([
-                f"{d['class_name']} ({d['confidence']:.2f})"
-                for d in sorted(result, key=lambda x: -x['confidence'])
-            ])
-            logger.info(f"🔍 Detected objects with bboxes: {detected_summary}")
+                # Add detection with frame index
+                all_detections.append({
+                    'class_name': detection['class_name'],
+                    'confidence': confidence,
+                    'bbox': detection['bbox'],
+                    'frame_index': frame_idx
+                })
 
-        return result
+        # Log summary
+        if all_detections:
+            # Count unique objects
+            unique_classes = set(d['class_name'] for d in all_detections)
+            logger.info(f"🔍 Detected {len(all_detections)} objects across frames: {', '.join(sorted(unique_classes))}")
+        else:
+            logger.info("🔍 No objects detected in frames")
+
+        return all_detections
