@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 class ObjectDetector:
     """Object detection using YOLOv8 Nano model"""
 
-    CONFIDENCE_THRESHOLD = 0.6
-
-    def __init__(self, confidence_threshold: float = 0.25, model_name: str = 'yolov8n.pt'):
+    def __init__(self, confidence_threshold: float, model_name: str = 'yolov8n.pt'):
         """
         Initialize object detector
 
@@ -117,10 +115,6 @@ class ObjectDetector:
                 class_name = detection['class_name']
                 confidence = detection['confidence']
 
-                # Skip detections below 60% confidence
-                if confidence < self.CONFIDENCE_THRESHOLD:
-                    continue
-
                 # Keep the highest confidence score for each class
                 if class_name not in detections_aggregate:
                     detections_aggregate[class_name] = confidence
@@ -174,16 +168,10 @@ class ObjectDetector:
 
             # Add all detections from this frame
             for detection in detections:
-                confidence = detection['confidence']
-
-                # Skip detections below 60% confidence
-                if confidence < self.CONFIDENCE_THRESHOLD:
-                    continue
-
                 # Add detection with frame index
                 all_detections.append({
                     'class_name': detection['class_name'],
-                    'confidence': confidence,
+                    'confidence': detection['confidence'],
                     'bbox': detection['bbox'],
                     'frame_index': frame_idx
                 })

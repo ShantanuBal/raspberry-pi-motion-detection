@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 class MotionDetector:
     """Motion detection using frame differencing"""
 
+    CONFIDENCE_THRESHOLD = 0.6
+
     def __init__(self, output_dir: Path, min_motion_area: int = 500, camera_index: int = 0, use_picamera: bool = True):
         """
         Initialize motion detector
@@ -91,7 +93,7 @@ class MotionDetector:
         try:
             from lib.object_detector import ObjectDetector
             logger.info("Initializing object detector...")
-            self.object_detector = ObjectDetector(confidence_threshold=0.25)
+            self.object_detector = ObjectDetector(confidence_threshold=self.CONFIDENCE_THRESHOLD)
             logger.info("✓ Object detector initialized")
         except Exception as e:
             logger.warning(f"Failed to initialize object detector: {e}")
