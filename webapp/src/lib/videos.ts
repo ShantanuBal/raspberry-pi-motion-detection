@@ -29,7 +29,6 @@ export interface VideoMetadata {
   camera: string;
   bucket: string;
   detectedObjects?: string[];
-  detectionsBboxes?: Detection[];
 }
 
 export interface PaginatedVideos {
@@ -88,7 +87,6 @@ export async function listVideosFromDynamoDB(continuationToken?: string, camera?
       camera: item.camera as string,
       bucket: item.bucket as string,
       detectedObjects: item.detectedObjects as string[] | undefined,
-      detectionsBboxes: item.detectionsBboxes as Detection[] | undefined,
     }));
 
     // Encode the LastEvaluatedKey as continuation token

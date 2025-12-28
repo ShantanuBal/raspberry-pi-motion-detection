@@ -237,9 +237,20 @@ def main():
                         if detected_objects:
                             detected_classes = sorted(detected_objects.keys())
 
-                        if s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score, camera_type=camera_type_str, detected_objects=detected_classes, detections_with_bboxes=detections_with_bboxes):
+                        if s3_uploader.upload_motion_clip(clip_path, duration, motion_score=motion_score, camera_type=camera_type_str, detected_objects=detected_classes):
                             upload_time = time.time() - upload_start
-                            logger.info(f"✅ Upload successful in {upload_time:.1f}s")
+                            logger.info(f"✅ Video upload successful in {upload_time:.1f}s")
+
+                            # Upload bounding boxes if available
+                            if detections_with_bboxes:
+                                logger.info("Uploading bounding box data...")
+                                try:
+                                    if s3_uploader.upload_bboxes_json(detections_with_bboxes, clip_path):
+                                        logger.info("✅ Bounding boxes upload successful")
+                                    else:
+                                        logger.warning("⚠️  Bounding boxes upload failed (video still uploaded)")
+                                except Exception as e:
+                                    logger.error(f"Error uploading bounding boxes: {e}")
 
                             # Send CloudWatch metrics
                             cloudwatch.send_metric('VideoUploaded', value=1.0, unit='Count')

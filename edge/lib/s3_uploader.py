@@ -183,8 +183,7 @@ class S3Uploader:
     
     def upload_motion_clip(self, video_path: str, duration: Optional[float] = None,
                           motion_score: Optional[float] = None, camera_type: Optional[str] = None,
-                          detected_objects: Optional[List[str]] = None,
-                          detections_with_bboxes: Optional[List[dict]] = None) -> bool:
+                          detected_objects: Optional[List[str]] = None) -> bool:
         """
         Upload a motion-detected video clip with metadata
 
@@ -194,8 +193,6 @@ class S3Uploader:
             motion_score: Optional motion detection score/confidence
             camera_type: Optional camera type (e.g., 'picamera', 'usb')
             detected_objects: Optional list of detected object class names (e.g., ['person', 'cat'])
-            detections_with_bboxes: Optional list of detections with bounding boxes
-                Each detection contains: class_name, confidence, bbox [x1,y1,x2,y2], frame_index
 
         Returns:
             True if successful, False otherwise
@@ -214,12 +211,55 @@ class S3Uploader:
         if detected_objects is not None:
             # Store as comma-separated string (S3 metadata must be strings)
             metadata['detected_objects'] = ','.join(detected_objects)
-        if detections_with_bboxes is not None and len(detections_with_bboxes) > 0:
-            # Store bounding box data as JSON string (S3 metadata must be strings)
-            # Note: S3 metadata has a 2KB limit per key, so we keep it compact
-            metadata['detections_bboxes'] = json.dumps(detections_with_bboxes)
 
         return self.upload_file(video_path, metadata=metadata)
+
+    def upload_bboxes_json(self, detections_with_bboxes: List[dict], video_path: str) -> bool:
+        """
+        Upload bounding box data as a separate JSON file
+
+        Args:
+            detections_with_bboxes: List of detection objects with bounding boxes
+                Each detection contains: class_name, confidence, bbox [x1,y1,x2,y2], frame_index
+            video_path: Local path to video file (used to derive S3 key)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not detections_with_bboxes:
+            logger.warning("No bounding box data to upload")
+            return False
+
+        try:
+            # Derive bbox filename from video filename
+            # Example: /path/to/20251226_153045_usb_motion_clip.mp4
+            #       -> motion_detections/20251226_153045_usb_motion_clip_bboxes.json
+            video_filename = Path(video_path).name
+            bbox_filename = video_filename.replace('.mp4', '_bboxes.json')
+            s3_key = f"motion_detections/{bbox_filename}"
+
+            # Create temporary JSON file
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                json.dump(detections_with_bboxes, f, indent=2)
+                temp_json_path = f.name
+
+            # Upload JSON file to S3
+            try:
+                self.s3_client.upload_file(
+                    temp_json_path,
+                    self.bucket_name,
+                    s3_key
+                )
+                logger.info(f"Successfully uploaded bbox data to s3://{self.bucket_name}/{s3_key}")
+                return True
+            finally:
+                # Clean up temp file
+                Path(temp_json_path).unlink(missing_ok=True)
+
+        except Exception as e:
+            logger.error(f"Error uploading bounding box JSON: {e}")
+            return False
     
     def list_recent_uploads(self, prefix: str = "motion_detections/", max_items: int = 10):
         """

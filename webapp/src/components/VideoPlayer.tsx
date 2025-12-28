@@ -11,7 +11,7 @@ interface Detection {
 
 interface VideoPlayerProps {
   videoUrl: string;
-  detections?: Detection[];
+  bboxUrl?: string | null;
   onLoadStart?: () => void;
   onLoadedData?: () => void;
   onCanPlay?: () => void;
@@ -31,7 +31,7 @@ const DEFAULT_COLOR = "#FFFF00"; // Yellow
 
 export default function VideoPlayer({
   videoUrl,
-  detections,
+  bboxUrl,
   onLoadStart,
   onLoadedData,
   onCanPlay,
@@ -41,7 +41,8 @@ export default function VideoPlayer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showBboxes, setShowBboxes] = useState(true);
-  const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
+  const [detections, setDetections] = useState<Detection[] | null>(null);
+  const [loadingBboxes, setLoadingBboxes] = useState(false);
 
   // Draw bounding boxes on canvas
   const drawBoundingBoxes = () => {
@@ -129,14 +130,26 @@ export default function VideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
-    setVideoDimensions({
-      width: video.videoWidth,
-      height: video.videoHeight,
-    });
-
     updateCanvasSize();
     if (onLoadedData) onLoadedData();
   };
+
+  // Fetch bbox data when bboxUrl changes
+  useEffect(() => {
+    if (bboxUrl) {
+      setLoadingBboxes(true);
+      fetch(bboxUrl)
+        .then(res => res.json())
+        .then(data => setDetections(data))
+        .catch(err => {
+          console.error('Failed to fetch bounding boxes:', err);
+          setDetections(null);
+        })
+        .finally(() => setLoadingBboxes(false));
+    } else {
+      setDetections(null);
+    }
+  }, [bboxUrl]);
 
   // Redraw bboxes on video timeupdate (in case video is paused)
   useEffect(() => {

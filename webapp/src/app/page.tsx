@@ -6,13 +6,6 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import VideoPlayer from "@/components/VideoPlayer";
 
-interface Detection {
-  class_name: string;
-  confidence: number;
-  bbox: [number, number, number, number]; // [x1, y1, x2, y2]
-  frame_index: number;
-}
-
 interface Video {
   key: string;
   name: string;
@@ -21,7 +14,6 @@ interface Video {
   starred?: boolean;
   camera?: string;
   detectedObjects?: string[];
-  detectionsBboxes?: Detection[];
 }
 
 function formatBytes(bytes: number): string {
@@ -53,6 +45,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoBboxUrl, setVideoBboxUrl] = useState<string | null>(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [continuationToken, setContinuationToken] = useState<string | undefined>();
   const [previousTokens, setPreviousTokens] = useState<(string | undefined)[]>([]);
@@ -176,6 +169,7 @@ export default function HomePage() {
     setSelectedVideo(video);
     setLoadingVideo(true);
     setVideoUrl(null);
+    setVideoBboxUrl(null);
 
     try {
       const encodedKey = Buffer.from(video.key).toString("base64");
@@ -185,7 +179,9 @@ export default function HomePage() {
       if (!response.ok) throw new Error("Failed to get video URL");
       const data = await response.json();
       console.log("[playVideo] Presigned URL received:", data.url);
+      console.log("[playVideo] Bbox URL:", data.bboxUrl);
       setVideoUrl(data.url);
+      setVideoBboxUrl(data.bboxUrl || null);
     } catch (err) {
       setError("Failed to load video");
       console.error("[playVideo] Error:", err);
@@ -197,6 +193,7 @@ export default function HomePage() {
   const closeVideo = () => {
     setSelectedVideo(null);
     setVideoUrl(null);
+    setVideoBboxUrl(null);
   };
 
   const getCurrentVideoIndex = () => {
@@ -533,7 +530,7 @@ export default function HomePage() {
                 ) : videoUrl ? (
                   <VideoPlayer
                     videoUrl={videoUrl}
-                    detections={selectedVideo.detectionsBboxes}
+                    bboxUrl={videoBboxUrl}
                     onLoadStart={() => console.log("[video] Load started, S3 URL:", videoUrl)}
                     onLoadedData={() => console.log("[video] Data loaded")}
                     onCanPlay={() => console.log("[video] Can play")}
