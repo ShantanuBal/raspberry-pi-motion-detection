@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
@@ -39,7 +39,7 @@ function formatDate(dateString: string): string {
   });
 }
 
-export default function HomePage() {
+function HomePageContent() {
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,7 +69,7 @@ export default function HomePage() {
     setCameraFilter(camera);
     setShowCatsOnly(cats);
     setShowPeopleOnly(people);
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     fetchVideos();
@@ -588,5 +588,13 @@ export default function HomePage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-900 flex items-center justify-center"><div className="text-gray-400">Loading...</div></div>}>
+      <HomePageContent />
+    </Suspense>
   );
 }
