@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import VideoPlayer from "@/components/VideoPlayer";
@@ -40,6 +41,9 @@ function formatDate(dateString: string): string {
 
 export default function HomePage() {
   const { data: session } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,10 +60,32 @@ export default function HomePage() {
   const [showCatsOnly, setShowCatsOnly] = useState<boolean>(false);
   const [showPeopleOnly, setShowPeopleOnly] = useState<boolean>(false);
 
+  // Initialize filters from URL params on mount
+  useEffect(() => {
+    const camera = searchParams.get('camera') || 'all';
+    const cats = searchParams.get('cats') === 'true';
+    const people = searchParams.get('people') === 'true';
+
+    setCameraFilter(camera);
+    setShowCatsOnly(cats);
+    setShowPeopleOnly(people);
+  }, []);
+
   useEffect(() => {
     fetchVideos();
     fetchStarredVideos();
   }, [cameraFilter]);
+
+  // Update URL when filters change
+  const updateURL = (camera: string, cats: boolean, people: boolean) => {
+    const params = new URLSearchParams();
+    if (camera !== 'all') params.set('camera', camera);
+    if (cats) params.set('cats', 'true');
+    if (people) params.set('people', 'true');
+
+    const queryString = params.toString();
+    router.push(queryString ? `/?${queryString}` : '/', { scroll: false });
+  };
 
   const fetchStarredVideos = async () => {
     try {
@@ -266,10 +292,12 @@ export default function HomePage() {
                     id="camera-filter"
                     value={cameraFilter}
                     onChange={(e) => {
-                      setCameraFilter(e.target.value);
+                      const newCamera = e.target.value;
+                      setCameraFilter(newCamera);
                       setPreviousTokens([]);
                       setCurrentPage(0);
                       setContinuationToken(undefined);
+                      updateURL(newCamera, showCatsOnly, showPeopleOnly);
                     }}
                     className="bg-gray-700 text-white text-sm rounded px-3 py-1 border border-gray-600 focus:outline-none focus:border-blue-500"
                   >
@@ -279,7 +307,11 @@ export default function HomePage() {
                   </select>
                 </div>
                 <button
-                  onClick={() => setShowCatsOnly(!showCatsOnly)}
+                  onClick={() => {
+                    const newCatsOnly = !showCatsOnly;
+                    setShowCatsOnly(newCatsOnly);
+                    updateURL(cameraFilter, newCatsOnly, showPeopleOnly);
+                  }}
                   className={`flex items-center gap-2 px-3 py-1 text-sm rounded transition-colors ${
                     showCatsOnly
                       ? 'bg-blue-600 text-white'
@@ -290,7 +322,11 @@ export default function HomePage() {
                   🐱 Cats
                 </button>
                 <button
-                  onClick={() => setShowPeopleOnly(!showPeopleOnly)}
+                  onClick={() => {
+                    const newPeopleOnly = !showPeopleOnly;
+                    setShowPeopleOnly(newPeopleOnly);
+                    updateURL(cameraFilter, showCatsOnly, newPeopleOnly);
+                  }}
                   className={`flex items-center gap-2 px-3 py-1 text-sm rounded transition-colors ${
                     showPeopleOnly
                       ? 'bg-blue-600 text-white'
