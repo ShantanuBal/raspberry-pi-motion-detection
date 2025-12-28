@@ -67,8 +67,23 @@ export default function VideoPlayer({
     const scaleX = canvas.width / videoWidth;
     const scaleY = canvas.height / videoHeight;
 
-    // Draw each detection
-    detections.forEach((detection) => {
+    // Calculate current frame index based on video time
+    // Assume 30 fps (standard for most videos)
+    const fps = 30;
+    const currentFrameIndex = Math.floor(video.currentTime * fps);
+
+    // Filter detections to only show those near the current frame
+    // Object detection runs every 10 frames on the edge device
+    // Show detections within +/- 30 frames (1 second at 30fps)
+    // This ensures smooth transitions as we move between sampled frames
+    const frameWindow = 30;
+    const visibleDetections = detections.filter((detection) => {
+      const frameDiff = Math.abs(detection.frame_index - currentFrameIndex);
+      return frameDiff <= frameWindow;
+    });
+
+    // Draw each visible detection
+    visibleDetections.forEach((detection) => {
       const [x1, y1, x2, y2] = detection.bbox;
       const className = detection.class_name;
       const confidence = detection.confidence;
