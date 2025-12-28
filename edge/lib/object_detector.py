@@ -10,9 +10,10 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-
 class ObjectDetector:
     """Object detection using YOLOv8 Nano model"""
+
+    CONFIDENCE_THRESHOLD = 0.6
 
     def __init__(self, confidence_threshold: float = 0.25, model_name: str = 'yolov8n.pt'):
         """
@@ -116,8 +117,8 @@ class ObjectDetector:
                 class_name = detection['class_name']
                 confidence = detection['confidence']
 
-                # Skip detections below 50% confidence
-                if confidence < 0.5:
+                # Skip detections below 60% confidence
+                if confidence < self.CONFIDENCE_THRESHOLD:
                     continue
 
                 # Keep the highest confidence score for each class
@@ -175,8 +176,8 @@ class ObjectDetector:
             for detection in detections:
                 confidence = detection['confidence']
 
-                # Skip detections below 50% confidence
-                if confidence < 0.5:
+                # Skip detections below 60% confidence
+                if confidence < self.CONFIDENCE_THRESHOLD:
                     continue
 
                 # Add detection with frame index
