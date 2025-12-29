@@ -69,7 +69,7 @@ export default function VideoPlayer({
 
     // Calculate current frame index based on video time
     // Must match VIDEO_FPS constant in edge/lib/motion_detector.py:21
-    const fps = 20;
+    const fps = 30;
     const currentFrameIndex = Math.floor(video.currentTime * fps);
 
     // Find the closest sampled frame
