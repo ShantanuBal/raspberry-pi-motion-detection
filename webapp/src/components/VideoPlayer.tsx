@@ -72,14 +72,15 @@ export default function VideoPlayer({
     const fps = 30;
     const currentFrameIndex = Math.floor(video.currentTime * fps);
 
-    // Filter detections to only show those near the current frame
-    // Object detection runs every 10 frames on the edge device
-    // Show detections within +/- 30 frames (1 second at 30fps)
-    // This ensures smooth transitions as we move between sampled frames
-    const frameWindow = 30;
+    // Find the closest sampled frame
+    // Object detection runs every 10 frames (0, 10, 20, 30, ...)
+    // Show only detections from the nearest sampled frame
+    const sampleRate = 10;
+    const closestSampledFrame = Math.round(currentFrameIndex / sampleRate) * sampleRate;
+
+    // Filter to show only detections from the closest sampled frame
     const visibleDetections = detections.filter((detection) => {
-      const frameDiff = Math.abs(detection.frame_index - currentFrameIndex);
-      return frameDiff <= frameWindow;
+      return detection.frame_index === closestSampledFrame;
     });
 
     // Draw each visible detection
