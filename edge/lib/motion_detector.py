@@ -18,7 +18,7 @@ class MotionDetector:
     """Motion detection using frame differencing"""
 
     CONFIDENCE_THRESHOLD = 0.6
-    VIDEO_FPS = 30  # Frames per second for recorded videos
+    VIDEO_FPS = 20  # Frames per second for recorded videos
 
     def __init__(self, output_dir: Path, min_motion_area: int = 500, camera_index: int = 0, use_picamera: bool = True):
         """
