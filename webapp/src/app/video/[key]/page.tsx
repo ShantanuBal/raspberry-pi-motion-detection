@@ -100,6 +100,25 @@ export default function VideoPage() {
     }
   };
 
+  const deleteVideo = async (video: Video) => {
+    try {
+      const encodedKey = Buffer.from(video.key).toString("base64");
+      const response = await fetch(`/api/videos/${encodedKey}/delete`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // Redirect to home page after successful deletion
+        router.push("/");
+      } else {
+        setError("Failed to delete video");
+      }
+    } catch (err) {
+      console.error("Failed to delete video:", err);
+      setError("Failed to delete video");
+    }
+  };
+
   if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -128,9 +147,11 @@ export default function VideoPage() {
               videoBboxUrl={videoBboxUrl}
               loadingVideo={false}
               onToggleStar={toggleStar}
+              onDelete={deleteVideo}
               isStarred={isStarred}
               showNavigation={false}
               showCloseButton={false}
+              showDeleteButton={true}
             />
             <div className="mt-4 text-center">
               <p className="text-gray-400 text-sm">

@@ -222,6 +222,29 @@ function HomePageContent() {
     setVideoBboxUrl(null);
   };
 
+  const deleteVideo = async (video: Video) => {
+    try {
+      const encodedKey = Buffer.from(video.key).toString("base64");
+      const response = await fetch(`/api/videos/${encodedKey}/delete`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        setVideos(videos.filter((v) => v.key !== video.key));
+        // Close modal if this video is currently open
+        if (selectedVideo?.key === video.key) {
+          closeVideo();
+        }
+      } else {
+        setError("Failed to delete video");
+      }
+    } catch (err) {
+      console.error("Failed to delete video:", err);
+      setError("Failed to delete video");
+    }
+  };
+
   const getCurrentVideoIndex = () => {
     if (!selectedVideo) return -1;
     return videos.findIndex((v) => v.key === selectedVideo.key);
@@ -491,11 +514,13 @@ function HomePageContent() {
               onNavigateNext={playNextVideo}
               onNavigatePrev={playPreviousVideo}
               onToggleStar={(video) => toggleStar(video, new MouseEvent('click') as any)}
+              onDelete={deleteVideo}
               isStarred={starredVideoKeys.has(selectedVideo.key)}
               hasNext={getCurrentVideoIndex() < videos.length - 1}
               hasPrev={getCurrentVideoIndex() > 0}
               showNavigation={true}
               showCloseButton={true}
+              showDeleteButton={true}
             />
           </div>
         </div>

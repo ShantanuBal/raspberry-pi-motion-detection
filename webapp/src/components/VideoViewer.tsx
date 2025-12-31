@@ -22,11 +22,13 @@ interface VideoViewerProps {
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
   onToggleStar?: (video: Video) => void;
+  onDelete?: (video: Video) => void;
   isStarred?: boolean;
   hasNext?: boolean;
   hasPrev?: boolean;
   showNavigation?: boolean;
   showCloseButton?: boolean;
+  showDeleteButton?: boolean;
 }
 
 export default function VideoViewer({
@@ -38,13 +40,16 @@ export default function VideoViewer({
   onNavigateNext,
   onNavigatePrev,
   onToggleStar,
+  onDelete,
   isStarred = false,
   hasNext = false,
   hasPrev = false,
   showNavigation = true,
   showCloseButton = true,
+  showDeleteButton = true,
 }: VideoViewerProps) {
   const [videoError, setVideoError] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const videoEl = e.currentTarget;
@@ -154,6 +159,30 @@ export default function VideoViewer({
             </button>
           )}
 
+          {/* Delete Button */}
+          {showDeleteButton && onDelete && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="p-2 text-sm bg-red-600 hover:bg-red-500 text-white rounded transition-colors"
+              title="Delete video"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          )}
+
           {/* Open in New Tab */}
           <button
             onClick={() => {
@@ -223,6 +252,37 @@ export default function VideoViewer({
           />
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-10">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md mx-4">
+            <h3 className="text-white text-lg font-semibold mb-2">
+              Delete Video?
+            </h3>
+            <p className="text-gray-300 text-sm mb-6">
+              Are you sure you want to permanently delete this video? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  if (onDelete) onDelete(video);
+                }}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 text-white rounded transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

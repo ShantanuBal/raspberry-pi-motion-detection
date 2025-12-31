@@ -49,7 +49,7 @@ export async function listVideosFromDynamoDB(continuationToken?: string, camera?
       }
     }
 
-    // Build the query with optional camera filter
+    // Build the query with optional camera filter and deleted filter
     const expressionAttributeNames: Record<string, string> = {
       '#partition': 'partition',
     };
@@ -57,12 +57,22 @@ export async function listVideosFromDynamoDB(continuationToken?: string, camera?
       ':partitionValue': 'all',
     };
 
-    let filterExpression: string | undefined = undefined;
+    const filterExpressions: string[] = [];
+
+    // Filter out deleted videos
+    filterExpressions.push('attribute_not_exists(deleted) OR deleted = :notDeleted');
+    expressionAttributeValues[':notDeleted'] = false;
+
+    // Add camera filter if specified
     if (camera) {
       expressionAttributeNames['#camera'] = 'camera';
       expressionAttributeValues[':camera'] = camera;
-      filterExpression = '#camera = :camera';
+      filterExpressions.push('#camera = :camera');
     }
+
+    const filterExpression = filterExpressions.length > 0
+      ? filterExpressions.join(' AND ')
+      : undefined;
 
     // Query the GSI sorted by uploadedAt (newest first)
     const command = new QueryCommand({
