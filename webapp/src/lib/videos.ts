@@ -37,7 +37,7 @@ export interface PaginatedVideos {
   hasMore: boolean;
 }
 
-export async function listVideosFromDynamoDB(continuationToken?: string, camera?: string): Promise<PaginatedVideos> {
+export async function listVideosFromDynamoDB(continuationToken?: string, camera?: string, startDate?: string, endDate?: string): Promise<PaginatedVideos> {
   try {
     // Parse continuation token (it's a base64 encoded lastEvaluatedKey)
     let exclusiveStartKey: any = undefined;
@@ -68,6 +68,23 @@ export async function listVideosFromDynamoDB(continuationToken?: string, camera?
       expressionAttributeNames['#camera'] = 'camera';
       expressionAttributeValues[':camera'] = camera;
       filterExpressions.push('#camera = :camera');
+    }
+
+    // Add date range filter if specified
+    if (startDate) {
+      const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
+      expressionAttributeNames['#uploadedAt'] = 'uploadedAt';
+      expressionAttributeValues[':startDate'] = startTimestamp;
+      filterExpressions.push('#uploadedAt >= :startDate');
+    }
+    if (endDate) {
+      // Add 1 day to end date to include the entire end date
+      const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000) + 86400;
+      if (!expressionAttributeNames['#uploadedAt']) {
+        expressionAttributeNames['#uploadedAt'] = 'uploadedAt';
+      }
+      expressionAttributeValues[':endDate'] = endTimestamp;
+      filterExpressions.push('#uploadedAt < :endDate');
     }
 
     const filterExpression = filterExpressions.length > 0

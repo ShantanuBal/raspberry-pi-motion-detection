@@ -59,29 +59,37 @@ function HomePageContent() {
   const [cameraFilter, setCameraFilter] = useState<string>("all");
   const [showCatsOnly, setShowCatsOnly] = useState<boolean>(false);
   const [showPeopleOnly, setShowPeopleOnly] = useState<boolean>(false);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   // Initialize filters from URL params on mount
   useEffect(() => {
     const camera = searchParams.get('camera') || 'all';
     const cats = searchParams.get('cats') === 'true';
     const people = searchParams.get('people') === 'true';
+    const start = searchParams.get('startDate') || '';
+    const end = searchParams.get('endDate') || '';
 
     setCameraFilter(camera);
     setShowCatsOnly(cats);
     setShowPeopleOnly(people);
+    setStartDate(start);
+    setEndDate(end);
   }, [searchParams]);
 
   useEffect(() => {
     fetchVideos();
     fetchStarredVideos();
-  }, [cameraFilter]);
+  }, [cameraFilter, startDate, endDate]);
 
   // Update URL when filters change
-  const updateURL = (camera: string, cats: boolean, people: boolean) => {
+  const updateURL = (camera: string, cats: boolean, people: boolean, start: string, end: string) => {
     const params = new URLSearchParams();
     if (camera !== 'all') params.set('camera', camera);
     if (cats) params.set('cats', 'true');
     if (people) params.set('people', 'true');
+    if (start) params.set('startDate', start);
+    if (end) params.set('endDate', end);
 
     const queryString = params.toString();
     router.push(queryString ? `/?${queryString}` : '/', { scroll: false });
@@ -142,6 +150,12 @@ function HomePageContent() {
       }
       if (cameraFilter !== 'all') {
         params.append('camera', cameraFilter);
+      }
+      if (startDate) {
+        params.append('startDate', startDate);
+      }
+      if (endDate) {
+        params.append('endDate', endDate);
       }
       const url = params.toString() ? `/api/videos?${params.toString()}` : '/api/videos';
       const response = await fetch(url);
@@ -320,7 +334,7 @@ function HomePageContent() {
                       setPreviousTokens([]);
                       setCurrentPage(0);
                       setContinuationToken(undefined);
-                      updateURL(newCamera, showCatsOnly, showPeopleOnly);
+                      updateURL(newCamera, showCatsOnly, showPeopleOnly, startDate, endDate);
                     }}
                     className="bg-gray-700 text-white text-sm rounded px-3 py-1 border border-gray-600 focus:outline-none focus:border-blue-500"
                   >
@@ -329,11 +343,63 @@ function HomePageContent() {
                     <option value="usb">🎥 USB</option>
                   </select>
                 </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="start-date" className="text-gray-400 text-sm">
+                    From:
+                  </label>
+                  <input
+                    id="start-date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      const newStartDate = e.target.value;
+                      setStartDate(newStartDate);
+                      setPreviousTokens([]);
+                      setCurrentPage(0);
+                      setContinuationToken(undefined);
+                      updateURL(cameraFilter, showCatsOnly, showPeopleOnly, newStartDate, endDate);
+                    }}
+                    className="bg-gray-700 text-white text-sm rounded px-3 py-1 border border-gray-600 focus:outline-none focus:border-blue-500"
+                  />
+                  <label htmlFor="end-date" className="text-gray-400 text-sm">
+                    To:
+                  </label>
+                  <input
+                    id="end-date"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      const newEndDate = e.target.value;
+                      setEndDate(newEndDate);
+                      setPreviousTokens([]);
+                      setCurrentPage(0);
+                      setContinuationToken(undefined);
+                      updateURL(cameraFilter, showCatsOnly, showPeopleOnly, startDate, newEndDate);
+                    }}
+                    className="bg-gray-700 text-white text-sm rounded px-3 py-1 border border-gray-600 focus:outline-none focus:border-blue-500"
+                  />
+                  {(startDate || endDate) && (
+                    <button
+                      onClick={() => {
+                        setStartDate('');
+                        setEndDate('');
+                        setPreviousTokens([]);
+                        setCurrentPage(0);
+                        setContinuationToken(undefined);
+                        updateURL(cameraFilter, showCatsOnly, showPeopleOnly, '', '');
+                      }}
+                      className="text-gray-400 hover:text-white text-sm"
+                      title="Clear date range"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     const newCatsOnly = !showCatsOnly;
                     setShowCatsOnly(newCatsOnly);
-                    updateURL(cameraFilter, newCatsOnly, showPeopleOnly);
+                    updateURL(cameraFilter, newCatsOnly, showPeopleOnly, startDate, endDate);
                   }}
                   className={`flex items-center gap-2 px-3 py-1 text-sm rounded transition-colors ${
                     showCatsOnly
@@ -348,7 +414,7 @@ function HomePageContent() {
                   onClick={() => {
                     const newPeopleOnly = !showPeopleOnly;
                     setShowPeopleOnly(newPeopleOnly);
-                    updateURL(cameraFilter, showCatsOnly, newPeopleOnly);
+                    updateURL(cameraFilter, showCatsOnly, newPeopleOnly, startDate, endDate);
                   }}
                   className={`flex items-center gap-2 px-3 py-1 text-sm rounded transition-colors ${
                     showPeopleOnly

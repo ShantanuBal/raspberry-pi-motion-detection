@@ -14,8 +14,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const continuationToken = searchParams.get("continuationToken") || undefined;
     const camera = searchParams.get("camera") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
 
-    const result = await listVideosFromDynamoDB(continuationToken, camera);
+    const result = await listVideosFromDynamoDB(continuationToken, camera, startDate, endDate);
 
     // Transform the response to match the expected format
     const videos = result.videos.map(video => ({
