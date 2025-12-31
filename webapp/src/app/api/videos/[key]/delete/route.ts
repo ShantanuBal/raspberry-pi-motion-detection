@@ -60,7 +60,7 @@ export async function DELETE(
 
     // Mark video as deleted in DynamoDB
     const updateCommand = new UpdateCommand({
-      TableName: process.env.DYNAMODB_VIDEOS_TABLE!,
+      TableName: process.env.VIDEOS_TABLE_NAME || "motion-detection-videos",
       Key: {
         videoKey: videoKey,
       },
