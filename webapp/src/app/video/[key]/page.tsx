@@ -5,14 +5,28 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import VideoViewer from "@/components/VideoViewer";
+
+interface Video {
+  key: string;
+  name: string;
+  lastModified: string;
+  size: number;
+  starred?: boolean;
+  camera?: string;
+  detectedObjects?: string[];
+}
 
 export default function VideoPage() {
   const { data: session, status } = useSession();
   const params = useParams();
   const router = useRouter();
+  const [video, setVideo] = useState<Video | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoBboxUrl, setVideoBboxUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isStarred, setIsStarred] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -22,21 +36,67 @@ export default function VideoPage() {
 
     if (status === "authenticated" && params.key) {
       fetchVideo(params.key as string);
+      checkIfStarred(params.key as string);
     }
   }, [status, params.key, router]);
+
+  const checkIfStarred = async (encodedKey: string) => {
+    try {
+      const response = await fetch("/api/starred");
+      if (response.ok) {
+        const data = await response.json();
+        const videoKey = Buffer.from(encodedKey, "base64").toString("utf-8");
+        const starred = data.videos.some((v: any) => v.videoKey === videoKey);
+        setIsStarred(starred);
+      }
+    } catch (err) {
+      console.error("Failed to check starred status:", err);
+    }
+  };
 
   const fetchVideo = async (encodedKey: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/videos/${encodedKey}`);
-      if (!response.ok) throw new Error("Failed to get video URL");
-      const data = await response.json();
-      setVideoUrl(data.url);
+      // Fetch video URL
+      const urlResponse = await fetch(`/api/videos/${encodedKey}`);
+      if (!urlResponse.ok) throw new Error("Failed to get video URL");
+      const urlData = await urlResponse.json();
+      setVideoUrl(urlData.url);
+      setVideoBboxUrl(urlData.bboxUrl || null);
+
+      // Decode key to get video metadata
+      const videoKey = Buffer.from(encodedKey, "base64").toString("utf-8");
+      const fileName = videoKey.split("/").pop() || videoKey;
+
+      // Create a basic video object
+      setVideo({
+        key: videoKey,
+        name: fileName,
+        lastModified: new Date().toISOString(),
+        size: 0,
+      });
     } catch (err) {
       setError("Failed to load video");
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleStar = async (video: Video) => {
+    try {
+      const method = isStarred ? "DELETE" : "POST";
+      const response = await fetch("/api/starred", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoKey: video.key }),
+      });
+
+      if (response.ok) {
+        setIsStarred(!isStarred);
+      }
+    } catch (err) {
+      console.error("Failed to toggle star:", err);
     }
   };
 
@@ -60,22 +120,18 @@ export default function VideoPage() {
       <main className="flex-1 flex items-center justify-center p-4">
         {error ? (
           <div className="text-red-400">{error}</div>
-        ) : videoUrl ? (
+        ) : video && videoUrl ? (
           <div className="w-full max-w-5xl">
-            <div className="bg-gray-800 rounded-lg overflow-hidden">
-              <video
-                src={videoUrl}
-                controls
-                autoPlay
-                className="w-full"
-                onError={(e) => {
-                  const video = e.currentTarget;
-                  console.error("[video] Error:", video.error?.message, video.error?.code);
-                }}
-              >
-                Your browser does not support the video tag.
-              </video>
-            </div>
+            <VideoViewer
+              video={video}
+              videoUrl={videoUrl}
+              videoBboxUrl={videoBboxUrl}
+              loadingVideo={false}
+              onToggleStar={toggleStar}
+              isStarred={isStarred}
+              showNavigation={false}
+              showCloseButton={false}
+            />
             <div className="mt-4 text-center">
               <p className="text-gray-400 text-sm">
                 Share this URL to give others access to this video

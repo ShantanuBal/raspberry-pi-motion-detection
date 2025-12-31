@@ -5,7 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
-import VideoPlayer from "@/components/VideoPlayer";
+import VideoViewer from "@/components/VideoViewer";
 
 interface Video {
   key: string;
@@ -479,140 +479,24 @@ function HomePageContent() {
       </main>
 
       {/* Video Modal */}
-      {selectedVideo && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg max-w-4xl w-full mx-4 overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-gray-700">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={playPreviousVideo}
-                  disabled={getCurrentVideoIndex() <= 0}
-                  className="p-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Previous"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={playNextVideo}
-                  disabled={getCurrentVideoIndex() >= videos.length - 1}
-                  className="p-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Next"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={(e) => toggleStar(selectedVideo, e)}
-                  className="p-2 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
-                  title={starredVideoKeys.has(selectedVideo.key) ? "Unstar" : "Star"}
-                >
-                  {starredVideoKeys.has(selectedVideo.key) ? (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 text-yellow-400"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                  ) : (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-                      />
-                    </svg>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    const encodedKey = Buffer.from(selectedVideo.key).toString("base64");
-                    window.open(`/video/${encodedKey}`, '_blank');
-                  }}
-                  className="p-2 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors flex items-center gap-2"
-                  title="Open in New Tab"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
-                  <span className="text-xs">Open in New Tab</span>
-                </button>
-              </div>
-              <h2 className="text-white font-medium flex-1 text-center">{formatDate(selectedVideo.lastModified)}</h2>
-              <button
-                onClick={closeVideo}
-                className="text-gray-400 hover:text-white text-2xl leading-none"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="p-4">
-              <div className="aspect-video bg-black rounded flex items-center justify-center">
-                {loadingVideo ? (
-                  <div className="text-gray-400">Loading video...</div>
-                ) : videoUrl ? (
-                  <VideoPlayer
-                    videoUrl={videoUrl}
-                    bboxUrl={videoBboxUrl}
-                    onLoadStart={() => console.log("[video] Load started, S3 URL:", videoUrl)}
-                    onLoadedData={() => console.log("[video] Data loaded")}
-                    onCanPlay={() => console.log("[video] Can play")}
-                    onError={(e) => {
-                      const video = e.currentTarget;
-                      console.error("[video] Error:", video.error?.message, video.error?.code);
-                      console.error("[video] Network state:", video.networkState);
-                      console.error("[video] Ready state:", video.readyState);
-                    }}
-                  />
-              ) : (
-                  <div className="text-red-400">Failed to load video</div>
-                )}
-              </div>
-            </div>
+      {selectedVideo && videoUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+          <div className="max-w-4xl w-full">
+            <VideoViewer
+              video={selectedVideo}
+              videoUrl={videoUrl}
+              videoBboxUrl={videoBboxUrl}
+              loadingVideo={loadingVideo}
+              onClose={closeVideo}
+              onNavigateNext={playNextVideo}
+              onNavigatePrev={playPreviousVideo}
+              onToggleStar={(video) => toggleStar(video, new MouseEvent('click') as any)}
+              isStarred={starredVideoKeys.has(selectedVideo.key)}
+              hasNext={getCurrentVideoIndex() < videos.length - 1}
+              hasPrev={getCurrentVideoIndex() > 0}
+              showNavigation={true}
+              showCloseButton={true}
+            />
           </div>
         </div>
       )}
