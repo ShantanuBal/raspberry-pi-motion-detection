@@ -145,12 +145,13 @@ export class MotionDetectionStack extends cdk.Stack {
       userName: 'motion-viewer-vercel-user',
     });
 
-    // Grant read-only access to the bucket for the Vercel user
+    // Grant read and delete access to the bucket for the Vercel user
     bucket.grantRead(vercelUser);
+    bucket.grantDelete(vercelUser);
 
     // Grant DynamoDB permissions to Vercel user for starred videos and video metadata
     starredVideosTable.grantReadWriteData(vercelUser);
-    videosTable.grantReadData(vercelUser);
+    videosTable.grantReadWriteData(vercelUser); // Changed to allow updating deleted flag
 
     // Lambda function to index videos when uploaded to S3
     const videoIndexerLambda = new lambda.Function(this, 'VideoIndexerFunction', {
