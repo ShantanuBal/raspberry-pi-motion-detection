@@ -70,32 +70,41 @@ export async function listVideosFromDynamoDB(continuationToken?: string, camera?
       filterExpressions.push('#camera = :camera');
     }
 
-    // Add date range filter if specified
-    if (startDate) {
-      const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-      expressionAttributeNames['#uploadedAt'] = 'uploadedAt';
-      expressionAttributeValues[':startDate'] = startTimestamp;
-      filterExpressions.push('#uploadedAt >= :startDate');
-    }
-    if (endDate) {
-      // Add 1 day to end date to include the entire end date
-      const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000) + 86400;
-      if (!expressionAttributeNames['#uploadedAt']) {
-        expressionAttributeNames['#uploadedAt'] = 'uploadedAt';
-      }
-      expressionAttributeValues[':endDate'] = endTimestamp;
-      filterExpressions.push('#uploadedAt < :endDate');
-    }
-
     const filterExpression = filterExpressions.length > 0
       ? filterExpressions.join(' AND ')
       : undefined;
+
+    // Build KeyConditionExpression with date range if specified
+    // uploadedAt is the sort key of the GSI, so we use it in KeyConditionExpression
+    let keyConditionExpression = '#partition = :partitionValue';
+
+    if (startDate && endDate) {
+      // Both dates specified - use BETWEEN
+      expressionAttributeNames['#uploadedAt'] = 'uploadedAt';
+      const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
+      const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000) + 86400;
+      expressionAttributeValues[':startDate'] = startTimestamp;
+      expressionAttributeValues[':endDate'] = endTimestamp;
+      keyConditionExpression += ' AND #uploadedAt BETWEEN :startDate AND :endDate';
+    } else if (startDate) {
+      // Only start date - greater than or equal
+      expressionAttributeNames['#uploadedAt'] = 'uploadedAt';
+      const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
+      expressionAttributeValues[':startDate'] = startTimestamp;
+      keyConditionExpression += ' AND #uploadedAt >= :startDate';
+    } else if (endDate) {
+      // Only end date - less than or equal
+      expressionAttributeNames['#uploadedAt'] = 'uploadedAt';
+      const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000) + 86400;
+      expressionAttributeValues[':endDate'] = endTimestamp;
+      keyConditionExpression += ' AND #uploadedAt <= :endDate';
+    }
 
     // Query the GSI sorted by uploadedAt (newest first)
     const command = new QueryCommand({
       TableName: VIDEOS_TABLE,
       IndexName: 'UploadTimeIndex',
-      KeyConditionExpression: '#partition = :partitionValue',
+      KeyConditionExpression: keyConditionExpression,
       ExpressionAttributeNames: expressionAttributeNames,
       ExpressionAttributeValues: expressionAttributeValues,
       FilterExpression: filterExpression,

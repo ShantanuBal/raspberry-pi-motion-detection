@@ -78,8 +78,15 @@ function HomePageContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    fetchVideos();
-    fetchStarredVideos();
+    // Only fetch if both dates are set or both are empty
+    // This prevents fetching with only one date selected
+    const bothDatesSet = startDate && endDate;
+    const noDatesSet = !startDate && !endDate;
+
+    if (bothDatesSet || noDatesSet) {
+      fetchVideos();
+      fetchStarredVideos();
+    }
   }, [cameraFilter, startDate, endDate]);
 
   // Update URL when filters change
