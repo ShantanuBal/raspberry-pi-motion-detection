@@ -4,7 +4,8 @@ Detects objects in video frames for motion detection tagging
 """
 
 import logging
-from typing import List, Dict, Set, Tuple
+import time
+from typing import List, Dict, Set, Tuple, Optional
 import numpy as np
 from pathlib import Path
 
@@ -13,17 +14,20 @@ logger = logging.getLogger(__name__)
 class ObjectDetector:
     """Object detection using YOLOv8 Nano model"""
 
-    def __init__(self, confidence_threshold: float, model_name: str = 'yolov8n.pt'):
+    def __init__(self, confidence_threshold: float, model_name: str = 'yolov8n.pt',
+                 cloudwatch_client=None):
         """
         Initialize object detector
 
         Args:
             confidence_threshold: Minimum confidence score for detections (0.0-1.0)
             model_name: YOLOv8 model to use (yolov8n.pt is fastest for Pi)
+            cloudwatch_client: Optional CloudWatch client for metrics
         """
         self.confidence_threshold = confidence_threshold
         self.model_name = model_name
         self.model = None
+        self.cloudwatch_client = cloudwatch_client
 
         # Try to load YOLO model
         try:
@@ -56,8 +60,21 @@ class ObjectDetector:
             return []
 
         try:
+            # Time single frame inference
+            start_time = time.time()
+
             # Run inference (verbose=False to suppress output)
             results = self.model(frame, verbose=False, conf=self.confidence_threshold)
+
+            # Record inference latency
+            inference_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+            if self.cloudwatch_client:
+                self.cloudwatch_client.send_metric(
+                    metric_name='SingleFrameInferenceLatency',
+                    value=inference_time,
+                    unit='Milliseconds'
+                )
+            logger.debug(f"Single frame inference took {inference_time:.2f}ms")
 
             detections = []
             for result in results:
@@ -155,6 +172,9 @@ class ObjectDetector:
         if not frames:
             return []
 
+        # Time full video inference
+        video_start_time = time.time()
+
         # Collect all detections across frames
         all_detections: List[Dict] = []
 
@@ -175,6 +195,16 @@ class ObjectDetector:
                     'bbox': detection['bbox'],
                     'frame_index': frame_idx
                 })
+
+        # Record full video inference latency
+        video_inference_time = (time.time() - video_start_time) * 1000  # Convert to milliseconds
+        if self.cloudwatch_client:
+            self.cloudwatch_client.send_metric(
+                metric_name='VideoInferenceLatency',
+                value=video_inference_time,
+                unit='Milliseconds'
+            )
+        logger.info(f"Full video inference took {video_inference_time:.2f}ms for {len(sampled_indices)} frames")
 
         # Log summary
         if all_detections:

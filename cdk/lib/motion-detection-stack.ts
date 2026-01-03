@@ -311,7 +311,53 @@ export class MotionDetectionStack extends cdk.Stack {
       }),
     );
 
-    // Row 3: Lambda Metrics
+    // Row 3: ML Inference Latency
+    dashboard.addWidgets(
+      // Single Frame Inference Latency
+      new cloudwatch.GraphWidget({
+        title: 'Single Frame Inference Latency (ms)',
+        width: 12,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'SingleFrameInferenceLatency',
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.BLUE,
+          }),
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'SingleFrameInferenceLatency',
+            statistic: 'Maximum',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.RED,
+          }),
+        ],
+      }),
+      // Full Video Inference Latency
+      new cloudwatch.GraphWidget({
+        title: 'Video Inference Latency (ms)',
+        width: 12,
+        left: [
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'VideoInferenceLatency',
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.PURPLE,
+          }),
+          new cloudwatch.Metric({
+            namespace: 'RaspberryPi/MotionDetection',
+            metricName: 'VideoInferenceLatency',
+            statistic: 'Maximum',
+            period: cdk.Duration.minutes(5),
+            color: cloudwatch.Color.ORANGE,
+          }),
+        ],
+      }),
+    );
+
+    // Row 4: Lambda Metrics
     dashboard.addWidgets(
       // Lambda Invocations
       new cloudwatch.GraphWidget({
@@ -354,7 +400,7 @@ export class MotionDetectionStack extends cdk.Stack {
       }),
     );
 
-    // Row 4: DynamoDB Metrics
+    // Row 5: DynamoDB Metrics
     dashboard.addWidgets(
       // DynamoDB Read/Write Capacity
       new cloudwatch.GraphWidget({
@@ -393,7 +439,7 @@ export class MotionDetectionStack extends cdk.Stack {
       }),
     );
 
-    // Row 5: S3 Metrics
+    // Row 6: S3 Metrics
     dashboard.addWidgets(
       // S3 Bucket Size
       new cloudwatch.GraphWidget({
@@ -431,7 +477,7 @@ export class MotionDetectionStack extends cdk.Stack {
       }),
     );
 
-    // Row 6: Alarms Summary
+    // Row 7: Alarms Summary
     const uptimeAlarm = new cloudwatch.Alarm(this, 'RaspberryPiDownAlarm', {
       metric: new cloudwatch.Metric({
         namespace: 'RaspberryPi/MotionDetection',

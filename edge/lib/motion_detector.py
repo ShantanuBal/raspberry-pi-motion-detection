@@ -20,7 +20,8 @@ class MotionDetector:
     CONFIDENCE_THRESHOLD = 0.6
     VIDEO_FPS = 20  # Frames per second for recorded videos
 
-    def __init__(self, output_dir: Path, min_motion_area: int = 500, camera_index: int = 0, use_picamera: bool = True):
+    def __init__(self, output_dir: Path, min_motion_area: int = 500, camera_index: int = 0,
+                 use_picamera: bool = True, cloudwatch_client=None):
         """
         Initialize motion detector
 
@@ -29,12 +30,14 @@ class MotionDetector:
             min_motion_area: Minimum contour area to trigger motion detection
             camera_index: Camera device index (default: 0, used for USB webcams)
             use_picamera: Use Raspberry Pi Camera Module (True) or USB webcam (False)
+            cloudwatch_client: Optional CloudWatch client for metrics
         """
         self.output_dir = output_dir
         self.min_motion_area = min_motion_area
         self.picam2 = None
         self.camera = None
         self.object_detector = None
+        self.cloudwatch_client = cloudwatch_client
 
         # Initialize camera based on user preference
         if use_picamera:
@@ -94,7 +97,10 @@ class MotionDetector:
         try:
             from lib.object_detector import ObjectDetector
             logger.info("Initializing object detector...")
-            self.object_detector = ObjectDetector(confidence_threshold=self.CONFIDENCE_THRESHOLD)
+            self.object_detector = ObjectDetector(
+                confidence_threshold=self.CONFIDENCE_THRESHOLD,
+                cloudwatch_client=self.cloudwatch_client
+            )
             logger.info("✓ Object detector initialized")
         except Exception as e:
             logger.warning(f"Failed to initialize object detector: {e}")

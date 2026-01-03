@@ -167,7 +167,8 @@ def main():
         output_dir=OUTPUT_DIR,
         min_motion_area=MIN_MOTION_AREA,
         camera_index=args.camera_index,
-        use_picamera=use_picamera
+        use_picamera=use_picamera,
+        cloudwatch_client=cloudwatch
     )
 
     try:
