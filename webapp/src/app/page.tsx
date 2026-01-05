@@ -77,9 +77,8 @@ function HomePageContent() {
     setEndDate(end);
   }, [searchParams]);
 
+  // Fetch videos when camera filter changes (independent of date validation)
   useEffect(() => {
-    // Only fetch if both dates are set or both are empty
-    // This prevents fetching with only one date selected
     const bothDatesSet = startDate && endDate;
     const noDatesSet = !startDate && !endDate;
 
@@ -87,7 +86,18 @@ function HomePageContent() {
       fetchVideos();
       fetchStarredVideos();
     }
-  }, [cameraFilter, startDate, endDate]);
+  }, [cameraFilter]);
+
+  // Fetch videos when date range changes (only if valid)
+  useEffect(() => {
+    const bothDatesSet = startDate && endDate;
+    const noDatesSet = !startDate && !endDate;
+
+    if (bothDatesSet || noDatesSet) {
+      fetchVideos();
+      fetchStarredVideos();
+    }
+  }, [startDate, endDate]);
 
   // Update URL when filters change
   const updateURL = (camera: string, cats: boolean, people: boolean, start: string, end: string) => {
